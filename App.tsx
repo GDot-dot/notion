@@ -9,7 +9,7 @@ import { ProjectPrecautions } from './components/ProjectPrecautions.tsx';
 import { TaskDetailModal } from './components/TaskDetailModal.tsx';
 import { Project, ViewType, TaskStatus, Task, TaskPriority } from './types.ts';
 import { INITIAL_PROJECTS, COLORS } from './constants.tsx';
-import { Plus, LayoutDashboard, Calendar, BarChart2, BookOpen, Trash2, Check, Edit3, Menu, LogIn, LogOut, Cloud } from 'lucide-react';
+import { Plus, LayoutDashboard, Calendar, BarChart2, BookOpen, Trash2, Check, Edit3, Menu, LogIn, LogOut, Cloud, ShieldAlert } from 'lucide-react';
 import { addDays } from 'date-fns';
 
 // Firebase Imports
@@ -17,26 +17,29 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { getFirestore, doc, setDoc, onSnapshot } from 'firebase/firestore';
 
-// ！！！ 請注意：這裡建議將這些 Config 放入環境變數中 ！！！
-// 以下為示意用的 Firebase 配置結構
+/**
+ * 🍓 請將你在 Firebase Console 取得的配置填入這裡 🍓
+ */
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyApdW3VyiDJc9kJhvl6KC2IB4Q7HX6jBGM",
+  authDomain: "notion-35f2a.firebaseapp.com",
+  projectId: "notion-35f2a",
+  storageBucket: "notion-35f2a.firebasestorage.app",
+  messagingSenderId: "83841265274",
+  appId: "1:83841265274:web:40300f10e24f9f25add5c3",
+  measurementId: "G-4D3LMLMZ0Q"
 };
 
-// 初始化 Firebase (如果沒配置會報錯，這裡加上簡單判斷)
-const app = firebaseConfig.apiKey !== "YOUR_API_KEY" ? initializeApp(firebaseConfig) : null;
+// 初始化 Firebase
+const isConfigured = firebaseConfig.apiKey !== "YOUR_API_KEY";
+const app = isConfigured ? initializeApp(firebaseConfig) : null;
 const auth = app ? getAuth(app) : null;
 const db = app ? getFirestore(app) : null;
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [projects, setProjects] = useState<Project[]>(INITIAL_PROJECTS);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(INITIAL_PROJECTS[0].id);
   const [activeView, setActiveView] = useState<ViewType>('dashboard');
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -58,17 +61,24 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!user || !db) return;
     const userDocRef = doc(db, 'users', user.uid);
-    return onSnapshot(userDocRef, (snapshot) => {
+    const unsubscribe = onSnapshot(userDocRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
-        if (data.projects) {
+        if (data.projects && data.projects.length > 0) {
           setProjects(data.projects);
-          if (!selectedProjectId && data.projects.length > 0) {
-            setSelectedProjectId(data.projects[0].id);
+          // 如果當前沒選或當前選的專案不存在於新資料中，預設選第一個
+          const currentExists = (id: string, list: Project[]): boolean => {
+            return list.some(p => p.id === id || currentExists(id, p.children));
+          };
+          if (!selectedProjectId || !currentExists(selectedProjectId, data.projects)) {
+             setSelectedProjectId(data.projects[0].id);
           }
         }
       }
+    }, (error) => {
+      console.error("Firestore Error:", error);
     });
+    return () => unsubscribe();
   }, [user, selectedProjectId]);
 
   // 3. 同步資料到 Firestore
@@ -76,15 +86,17 @@ const App: React.FC = () => {
     if (!user || !db) return;
     setIsSyncing(true);
     try {
-      await setDoc(doc(db, 'users', user.uid), { projects: newProjects }, { merge: true });
+      await setDoc(doc(db, 'users', user.uid), { 
+        projects: newProjects,
+        lastUpdated: new Date().toISOString()
+      }, { merge: true });
     } catch (e) {
       console.error("Sync Error:", e);
     } finally {
-      setIsSyncing(false);
+      setTimeout(() => setIsSyncing(false), 1000); // 延遲一下讓動畫美觀
     }
   }, [user]);
 
-  // 更新專案後同步
   const updateProjectsState = (newProjects: Project[]) => {
     setProjects(newProjects);
     syncToCloud(newProjects);
@@ -100,7 +112,7 @@ const App: React.FC = () => {
   };
 
   const currentProject = useMemo(() => {
-    return selectedProjectId ? findProject(selectedProjectId, projects) : projects[0];
+    return (selectedProjectId ? findProject(selectedProjectId, projects) : null) || projects[0];
   }, [selectedProjectId, projects]);
 
   const getAggregatedTasks = useCallback((proj: Project): Task[] => {
@@ -165,6 +177,10 @@ const App: React.FC = () => {
   };
 
   const deleteProject = (id: string) => {
+    if (projects.length === 1 && !projects[0].parentId) {
+      alert("至少需要保留一個計畫喔！🍭");
+      return;
+    }
     if (!confirm('確定要刪除這個計畫嗎？ 🥺')) return;
     const filter = (list: Project[]): Project[] => {
       return list.filter(p => p.id !== id).map(p => ({
@@ -181,11 +197,16 @@ const App: React.FC = () => {
 
   const handleLogin = async () => {
     if (!auth) {
-      alert("Firebase Config 尚未設定！請先完成設定。");
+      alert("Firebase 配置尚未填寫！請修改 App.tsx 中的 firebaseConfig。");
       return;
     }
     const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (e) {
+      console.error("Login Error:", e);
+      alert("登入失敗，請確認 Firebase Console 內的 Authentication 是否已啟用 Google 登入。");
+    }
   };
 
   const addTask = () => {
@@ -242,6 +263,13 @@ const App: React.FC = () => {
       />
 
       <main className="flex-1 p-4 md:p-8 overflow-y-auto max-h-screen custom-scrollbar transition-all duration-300">
+        {!isConfigured && (
+          <div className="bg-orange-100 border-l-4 border-orange-500 text-orange-700 p-4 mb-6 rounded-r-xl flex items-center gap-3 animate-bounce">
+            <ShieldAlert className="flex-shrink-0" />
+            <p className="text-sm font-bold">提示：請記得在 App.tsx 中填入你的 Firebase Config 才能開啟雲端同步喔！🍓</p>
+          </div>
+        )}
+
         <header className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-6">
           <div className="flex items-center gap-3 md:gap-6 group">
             <button 
@@ -275,7 +303,7 @@ const App: React.FC = () => {
               />
               <div className="flex items-center gap-4 mt-1 ml-2">
                 <span className="text-[10px] md:text-xs font-bold text-pink-300 uppercase tracking-widest">Project Space</span>
-                {isSyncing && <Cloud size={14} className="text-pink-300 animate-pulse" />}
+                {isSyncing && <Cloud size={14} className="text-pink-400 animate-pulse" />}
               </div>
             </div>
           </div>
@@ -286,12 +314,12 @@ const App: React.FC = () => {
                 onClick={handleLogin}
                 className="flex items-center gap-2 bg-white text-blue-500 px-4 py-2 rounded-xl font-bold text-sm shadow-md border border-blue-50 hover:bg-blue-50 transition-all active:scale-95"
               >
-                <LogIn size={18} /> Google 登入同步
+                <LogIn size={18} /> Google 登入
               </button>
             ) : (
               <div className="flex items-center gap-3 bg-white/60 p-1.5 pr-4 rounded-2xl border border-pink-100 shadow-sm">
                 <img src={user.photoURL || ''} className="w-8 h-8 rounded-full border-2 border-pink-200" alt="avatar" />
-                <button onClick={() => auth && signOut(auth)} className="text-pink-400 hover:text-pink-600 transition-colors">
+                <button onClick={() => auth && signOut(auth)} className="text-pink-400 hover:text-pink-600 transition-colors" title="登出">
                   <LogOut size={18} />
                 </button>
               </div>
@@ -306,7 +334,7 @@ const App: React.FC = () => {
               onClick={() => addProject(currentProject.id)}
               className="flex items-center gap-2 bg-pink-500 text-white px-4 md:px-6 py-2 rounded-xl md:rounded-2xl font-bold text-xs md:text-sm shadow-md hover:bg-pink-600 transition-all active:scale-95 flex-shrink-0"
             >
-              <Plus size={16} /> 建立子計畫
+              <Plus size={16} /> 子計畫
             </button>
           </div>
         </header>
@@ -374,6 +402,9 @@ const App: React.FC = () => {
                       </div>
                     </div>
                   ))}
+                  {currentProject.tasks.length === 0 && (
+                     <div className="text-center py-12 text-pink-200 font-bold italic">這層專案還沒有任務喔 🧸</div>
+                  )}
                 </div>
               </div>
 
