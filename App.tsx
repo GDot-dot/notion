@@ -1,16 +1,16 @@
 
 import React, { useState, useCallback, useMemo } from 'react';
-import { Sidebar } from './components/Sidebar';
-import { GanttChart } from './components/GanttChart';
-import { ProgressBoard } from './components/ProgressBoard';
-import { NotesArea } from './components/NotesArea';
-import { CalendarView } from './components/CalendarView';
-import { ProjectPrecautions } from './components/ProjectPrecautions';
-import { TaskDetailModal } from './components/TaskDetailModal';
-import { Project, ViewType, TaskStatus, Task, TaskPriority } from './types';
-import { INITIAL_PROJECTS, COLORS } from './constants';
-import { Plus, LayoutDashboard, Calendar, BarChart2, BookOpen, Trash2, Flag, Check, Edit3, Menu, X as CloseIcon } from 'lucide-react';
-import { format, addDays } from 'date-fns';
+import { Sidebar } from './components/Sidebar.tsx';
+import { GanttChart } from './components/GanttChart.tsx';
+import { ProgressBoard } from './components/ProgressBoard.tsx';
+import { NotesArea } from './components/NotesArea.tsx';
+import { CalendarView } from './components/CalendarView.tsx';
+import { ProjectPrecautions } from './components/ProjectPrecautions.tsx';
+import { TaskDetailModal } from './components/TaskDetailModal.tsx';
+import { Project, ViewType, TaskStatus, Task, TaskPriority } from './types.ts';
+import { INITIAL_PROJECTS, COLORS } from './constants.tsx';
+import { Plus, LayoutDashboard, Calendar, BarChart2, BookOpen, Trash2, Check, Edit3, Menu, X as CloseIcon } from 'lucide-react';
+import { addDays } from 'date-fns';
 
 const App: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>(INITIAL_PROJECTS);
@@ -110,7 +110,6 @@ const App: React.FC = () => {
 
   const addTask = () => {
     if (!currentProject) return;
-    // Native Date logic used as replacement for startOfDay which was reported as missing from date-fns
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const newTask: Task = {
@@ -143,11 +142,11 @@ const App: React.FC = () => {
   );
 
   return (
-    <div className="flex min-h-screen relative overflow-x-hidden">
+    <div className="flex min-h-screen relative overflow-x-hidden bg-[#fff5f8]">
       {/* 行動端側邊欄遮罩 */}
       {isSidebarOpen && (
         <div 
-          className="fixed inset-0 bg-pink-900/20 backdrop-blur-sm z-40 md:hidden"
+          className="fixed inset-0 bg-pink-900/20 backdrop-blur-sm z-40 md:hidden animate-in fade-in duration-300"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
@@ -165,11 +164,11 @@ const App: React.FC = () => {
 
       <main className="flex-1 p-4 md:p-8 overflow-y-auto max-h-screen custom-scrollbar transition-all duration-300">
         <header className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-6">
-          <div className="flex items-center gap-4 md:gap-6 group">
+          <div className="flex items-center gap-3 md:gap-6 group">
             {/* 行動端選單按鈕 */}
             <button 
               onClick={() => setIsSidebarOpen(true)}
-              className="md:hidden p-2 text-pink-500 bg-white rounded-xl shadow-sm border border-pink-100"
+              className="md:hidden p-2 text-pink-500 bg-white rounded-xl shadow-sm border border-pink-100 active:scale-90 transition-transform"
             >
               <Menu size={24} />
             </button>
@@ -196,7 +195,7 @@ const App: React.FC = () => {
             </div>
           </div>
           
-          <div className="flex items-center gap-2 md:gap-4 overflow-x-auto pb-2 md:pb-0">
+          <div className="flex items-center gap-2 md:gap-4 overflow-x-auto pb-2 md:pb-0 no-scrollbar">
              <button 
               onClick={() => deleteProject(currentProject.id)}
               className="flex items-center gap-2 bg-white text-pink-400 px-4 md:px-6 py-2 rounded-xl md:rounded-2xl font-bold text-xs md:text-sm shadow-sm border border-pink-100 hover:bg-red-50 hover:text-red-400 transition-all active:scale-95 flex-shrink-0"
@@ -245,7 +244,7 @@ const App: React.FC = () => {
                 />
               </div>
               
-              <div className="overflow-x-auto rounded-[32px] md:rounded-[40px]">
+              <div className="bg-white rounded-[32px] md:rounded-[40px] p-2 md:p-8 cute-shadow border border-pink-100">
                 <GanttChart tasks={aggregatedTasks} />
               </div>
 
@@ -289,7 +288,7 @@ const App: React.FC = () => {
                 </div>
               </div>
 
-              <div className="overflow-x-auto rounded-[32px] md:rounded-[40px]">
+              <div className="bg-white rounded-[32px] md:rounded-[40px] p-2 md:p-8 cute-shadow border border-pink-100">
                 <CalendarView tasks={aggregatedTasks} />
               </div>
             </div>
