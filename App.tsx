@@ -9,7 +9,7 @@ import { ProjectPrecautions } from './components/ProjectPrecautions.tsx';
 import { TaskDetailModal } from './components/TaskDetailModal.tsx';
 import { Project, ViewType, TaskStatus, Task, TaskPriority } from './types.ts';
 import { INITIAL_PROJECTS, COLORS } from './constants.tsx';
-import { Plus, LayoutDashboard, Calendar, BarChart2, BookOpen, Trash2, Check, Edit3, Menu, LogIn, LogOut, Cloud, ShieldAlert } from 'lucide-react';
+import { Plus, LayoutDashboard, Calendar, BarChart2, BookOpen, Trash2, Check, Edit3, Menu, LogIn, LogOut, Cloud, ShieldAlert, Loader2, Save, CloudCheck } from 'lucide-react';
 import { addDays } from 'date-fns';
 
 // Firebase Imports
@@ -18,7 +18,8 @@ import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signO
 import { getFirestore, doc, setDoc, onSnapshot } from 'firebase/firestore';
 
 /**
- * 🍓 請將你在 Firebase Console 取得的配置填入這裡 🍓
+ * 🍓 請確認這裡已經換成你的 Firebase 配置 🍓
+ * 如果這裡還是 "YOUR_API_KEY"，資料絕對無法上傳喔！
  */
 const firebaseConfig = {
   apiKey: "AIzaSyApdW3VyiDJc9kJhvl6KC2IB4Q7HX6jBGM",
@@ -30,7 +31,6 @@ const firebaseConfig = {
   measurementId: "G-4D3LMLMZ0Q"
 };
 
-// 初始化 Firebase
 const isConfigured = firebaseConfig.apiKey !== "YOUR_API_KEY";
 const app = isConfigured ? initializeApp(firebaseConfig) : null;
 const auth = app ? getAuth(app) : null;
@@ -38,35 +38,41 @@ const db = app ? getFirestore(app) : null;
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
-  const [projects, setProjects] = useState<Project[]>(INITIAL_PROJECTS);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(INITIAL_PROJECTS[0].id);
+  const [projects, setProjects] = useState<Project[]>(() => {
+    // 優先嘗試從 localStorage 讀取資料
+    const saved = localStorage.getItem('melody_local_data');
+    return saved ? JSON.parse(saved) : INITIAL_PROJECTS;
+  });
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(projects[0]?.id || null);
   const [activeView, setActiveView] = useState<ViewType>('dashboard');
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
 
   // 1. 監聽帳號狀態
   useEffect(() => {
     if (!auth) return;
     return onAuthStateChanged(auth, (u) => {
       setUser(u);
-      if (!u) {
-        setProjects(INITIAL_PROJECTS);
-        setSelectedProjectId(INITIAL_PROJECTS[0].id);
-      }
+      // 如果登出，保持當前狀態但切換為 local 模式
     });
   }, []);
 
   // 2. 監聽 Firestore 資料 (若已登入)
   useEffect(() => {
     if (!user || !db) return;
+    setIsLoadingData(true);
     const userDocRef = doc(db, 'users', user.uid);
     const unsubscribe = onSnapshot(userDocRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
         if (data.projects && data.projects.length > 0) {
           setProjects(data.projects);
-          // 如果當前沒選或當前選的專案不存在於新資料中，預設選第一個
+          setLastSyncedAt(data.lastUpdated || new Date().toISOString());
+          
+          // 確保選取的專案還存在
           const currentExists = (id: string, list: Project[]): boolean => {
             return list.some(p => p.id === id || currentExists(id, p.children));
           };
@@ -75,25 +81,33 @@ const App: React.FC = () => {
           }
         }
       }
+      setIsLoadingData(false);
     }, (error) => {
       console.error("Firestore Error:", error);
+      setIsLoadingData(false);
     });
     return () => unsubscribe();
   }, [user, selectedProjectId]);
 
-  // 3. 同步資料到 Firestore
+  // 3. 每當 projects 改變，儲存到 localStorage 並同步到雲端
+  useEffect(() => {
+    localStorage.setItem('melody_local_data', JSON.stringify(projects));
+  }, [projects]);
+
   const syncToCloud = useCallback(async (newProjects: Project[]) => {
     if (!user || !db) return;
     setIsSyncing(true);
     try {
+      const now = new Date().toISOString();
       await setDoc(doc(db, 'users', user.uid), { 
         projects: newProjects,
-        lastUpdated: new Date().toISOString()
+        lastUpdated: now
       }, { merge: true });
+      setLastSyncedAt(now);
     } catch (e) {
       console.error("Sync Error:", e);
     } finally {
-      setTimeout(() => setIsSyncing(false), 1000); // 延遲一下讓動畫美觀
+      setTimeout(() => setIsSyncing(false), 800);
     }
   }, [user]);
 
@@ -173,7 +187,6 @@ const App: React.FC = () => {
       updateProjectsState(updater(projects));
     }
     setSelectedProjectId(newProject.id);
-    if (window.innerWidth < 768) setIsSidebarOpen(false);
   };
 
   const deleteProject = (id: string) => {
@@ -197,15 +210,19 @@ const App: React.FC = () => {
 
   const handleLogin = async () => {
     if (!auth) {
-      alert("Firebase 配置尚未填寫！請修改 App.tsx 中的 firebaseConfig。");
+      alert("尚未完成 Firebase 配置！請將 App.tsx 中的 firebaseConfig 換成你在 Firebase Console 取得的代碼。");
       return;
     }
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
-    } catch (e) {
+    } catch (e: any) {
       console.error("Login Error:", e);
-      alert("登入失敗，請確認 Firebase Console 內的 Authentication 是否已啟用 Google 登入。");
+      if (e.code === 'auth/unauthorized-domain') {
+        alert("登入失敗：網域未授權。請到 Firebase Console > Authentication > Settings > Authorized domains 新增你的 GitHub Pages 網址。");
+      } else {
+        alert(`登入失敗: ${e.message}`);
+      }
     }
   };
 
@@ -223,19 +240,16 @@ const App: React.FC = () => {
       status: TaskStatus.TODO,
       priority: TaskPriority.MEDIUM,
       color: COLORS.taskColors[Math.floor(Math.random() * COLORS.taskColors.length)],
-      relatedProjectId: currentProject.parentId || undefined
     };
     updateProject(currentProject.id, { tasks: [...currentProject.tasks, newTask] });
     setEditingTaskId(newTask.id);
   };
 
-  if (!currentProject) return null;
-
   const CuteCheckbox = ({ checked, onChange }: { checked: boolean, onChange: () => void }) => (
     <div 
       onClick={(e) => { e.stopPropagation(); onChange(); }}
       className={`w-6 h-6 rounded-lg border-2 flex-shrink-0 flex items-center justify-center transition-all cursor-pointer ${
-        checked ? 'bg-pink-400 border-pink-400 text-white shadow-inner' : 'bg-white border-pink-200 hover:border-pink-300'
+        checked ? 'bg-pink-400 border-pink-400 text-white shadow-inner scale-110' : 'bg-white border-pink-200 hover:border-pink-300'
       }`}
     >
       {checked && <Check size={16} strokeWidth={4} />}
@@ -245,37 +259,28 @@ const App: React.FC = () => {
   return (
     <div className="flex min-h-screen relative overflow-x-hidden bg-[#fff5f8]">
       {isSidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-pink-900/20 backdrop-blur-sm z-40 md:hidden animate-in fade-in duration-300"
-          onClick={() => setIsSidebarOpen(false)}
-        />
+        <div className="fixed inset-0 bg-pink-900/20 backdrop-blur-sm z-40 md:hidden animate-in fade-in" onClick={() => setIsSidebarOpen(false)} />
       )}
 
       <Sidebar 
         projects={projects} 
         selectedProjectId={selectedProjectId || projects[0]?.id} 
         isOpen={isSidebarOpen}
-        onSelectProject={(id) => {
-          setSelectedProjectId(id);
-          if (window.innerWidth < 768) setIsSidebarOpen(false);
-        }}
+        onSelectProject={(id) => { setSelectedProjectId(id); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
         onAddProject={addProject}
       />
 
       <main className="flex-1 p-4 md:p-8 overflow-y-auto max-h-screen custom-scrollbar transition-all duration-300">
         {!isConfigured && (
-          <div className="bg-orange-100 border-l-4 border-orange-500 text-orange-700 p-4 mb-6 rounded-r-xl flex items-center gap-3 animate-bounce">
+          <div className="bg-orange-100 border-l-4 border-orange-500 text-orange-700 p-4 mb-6 rounded-r-xl flex items-center gap-3 animate-pulse">
             <ShieldAlert className="flex-shrink-0" />
-            <p className="text-sm font-bold">提示：請記得在 App.tsx 中填入你的 Firebase Config 才能開啟雲端同步喔！🍓</p>
+            <p className="text-sm font-bold">⚠️ 尚未連線到 Firebase：你的資料目前僅儲存在本機瀏覽器，換電腦或換瀏覽器會不見喔！🍓</p>
           </div>
         )}
 
         <header className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-6">
           <div className="flex items-center gap-3 md:gap-6 group">
-            <button 
-              onClick={() => setIsSidebarOpen(true)}
-              className="md:hidden p-2 text-pink-500 bg-white rounded-xl shadow-sm border border-pink-100 active:scale-90 transition-transform"
-            >
+            <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 text-pink-500 bg-white rounded-xl shadow-sm border border-pink-100 active:scale-90 transition-transform">
               <Menu size={24} />
             </button>
 
@@ -283,15 +288,15 @@ const App: React.FC = () => {
               const newLogo = prompt('請輸入 Emoji 或圖片網址 🍭', currentProject.logoUrl || '📁');
               if (newLogo !== null) updateProject(currentProject.id, { logoUrl: newLogo });
             }}>
-              <div className="w-12 h-12 md:w-20 md:h-20 bg-pink-100 rounded-2xl md:rounded-[32px] flex items-center justify-center text-2xl md:text-5xl shadow-inner border-2 border-white overflow-hidden transition-transform active:scale-95">
+              <div className="w-12 h-12 md:w-20 md:h-20 bg-white rounded-2xl md:rounded-[32px] flex items-center justify-center text-2xl md:text-5xl shadow-inner border-2 border-pink-100 overflow-hidden transition-all group-hover:shadow-lg">
                 {currentProject.logoUrl?.startsWith('http') ? (
                   <img src={currentProject.logoUrl} className="w-full h-full object-cover" alt="logo" />
                 ) : (
                   currentProject.logoUrl || '📁'
                 )}
               </div>
-              <div className="absolute -bottom-1 -right-1 bg-white p-1.5 rounded-full shadow-md border border-pink-100 group-hover:scale-110 transition-transform">
-                <Edit3 size={12} className="text-pink-400" />
+              <div className="absolute -bottom-1 -right-1 bg-pink-500 p-1.5 rounded-full shadow-md border-2 border-white group-hover:scale-125 transition-transform">
+                <Edit3 size={12} className="text-white" />
               </div>
             </div>
             
@@ -301,40 +306,62 @@ const App: React.FC = () => {
                 onChange={(e) => updateProject(currentProject.id, { name: e.target.value })}
                 className="text-2xl md:text-4xl font-black text-pink-600 bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-pink-100 rounded-xl px-2 w-full truncate transition-all"
               />
-              <div className="flex items-center gap-4 mt-1 ml-2">
-                <span className="text-[10px] md:text-xs font-bold text-pink-300 uppercase tracking-widest">Project Space</span>
-                {isSyncing && <Cloud size={14} className="text-pink-400 animate-pulse" />}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 ml-2">
+                <span className="text-[10px] md:text-xs font-bold text-pink-300 uppercase tracking-widest flex items-center gap-1">
+                  Workspace
+                </span>
+                
+                {/* 狀態指示燈 */}
+                <div className="flex items-center gap-2 px-2 py-0.5 bg-white/40 rounded-full border border-pink-100">
+                  {isSyncing || isLoadingData ? (
+                    <>
+                      <Loader2 size={12} className="text-pink-400 animate-spin" />
+                      <span className="text-[10px] text-pink-400 font-bold">同步中...</span>
+                    </>
+                  ) : user ? (
+                    <>
+                      <CloudCheck size={12} className="text-green-400" />
+                      <span className="text-[10px] text-green-500 font-bold">雲端已同步</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save size={12} className="text-blue-400" />
+                      <span className="text-[10px] text-blue-500 font-bold">儲存於本機</span>
+                    </>
+                  )}
+                </div>
+
+                {lastSyncedAt && (
+                  <span className="text-[10px] text-pink-200 font-medium">
+                    最後儲存: {new Date(lastSyncedAt).toLocaleTimeString()}
+                  </span>
+                )}
               </div>
             </div>
           </div>
           
           <div className="flex items-center gap-2 md:gap-4 overflow-x-auto pb-2 md:pb-0 no-scrollbar">
             {!user ? (
-              <button 
-                onClick={handleLogin}
-                className="flex items-center gap-2 bg-white text-blue-500 px-4 py-2 rounded-xl font-bold text-sm shadow-md border border-blue-50 hover:bg-blue-50 transition-all active:scale-95"
-              >
-                <LogIn size={18} /> Google 登入
-              </button>
+              <div className="flex flex-col items-end gap-1">
+                <button onClick={handleLogin} className="flex items-center gap-2 bg-white text-blue-500 px-4 py-2 rounded-xl font-bold text-sm shadow-md border border-blue-50 hover:bg-blue-50 transition-all active:scale-95">
+                  <LogIn size={18} /> Google 登入
+                </button>
+                <span className="text-[9px] text-blue-300 font-bold px-2 animate-pulse">登入以開啟雲端備份 ✨</span>
+              </div>
             ) : (
               <div className="flex items-center gap-3 bg-white/60 p-1.5 pr-4 rounded-2xl border border-pink-100 shadow-sm">
-                <img src={user.photoURL || ''} className="w-8 h-8 rounded-full border-2 border-pink-200" alt="avatar" />
-                <button onClick={() => auth && signOut(auth)} className="text-pink-400 hover:text-pink-600 transition-colors" title="登出">
-                  <LogOut size={18} />
-                </button>
+                <img src={user.photoURL || ''} className="w-8 h-8 rounded-full border-2 border-pink-200 shadow-sm" alt="avatar" />
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-bold text-pink-600 truncate max-w-[80px]">{user.displayName}</span>
+                  <button onClick={() => auth && signOut(auth)} className="text-[9px] font-bold text-pink-300 hover:text-red-400 transition-colors text-left">登出</button>
+                </div>
               </div>
             )}
-             <button 
-              onClick={() => deleteProject(currentProject.id)}
-              className="flex items-center gap-2 bg-white text-pink-400 px-4 md:px-6 py-2 rounded-xl md:rounded-2xl font-bold text-xs md:text-sm shadow-sm border border-pink-100 hover:bg-red-50 hover:text-red-400 transition-all active:scale-95 flex-shrink-0"
-            >
+             <button onClick={() => deleteProject(currentProject.id)} className="flex items-center gap-2 bg-white text-pink-300 px-4 md:px-6 py-2 rounded-xl md:rounded-2xl font-bold text-xs md:text-sm shadow-sm border border-pink-100 hover:bg-red-50 hover:text-red-400 transition-all active:scale-95">
               <Trash2 size={16} />
             </button>
-            <button 
-              onClick={() => addProject(currentProject.id)}
-              className="flex items-center gap-2 bg-pink-500 text-white px-4 md:px-6 py-2 rounded-xl md:rounded-2xl font-bold text-xs md:text-sm shadow-md hover:bg-pink-600 transition-all active:scale-95 flex-shrink-0"
-            >
-              <Plus size={16} /> 子計畫
+            <button onClick={() => addProject(currentProject.id)} className="flex items-center gap-2 bg-pink-500 text-white px-4 md:px-6 py-2 rounded-xl md:rounded-2xl font-bold text-xs md:text-sm shadow-md hover:bg-pink-600 transition-all active:scale-95">
+              <Plus size={16} /> 建立計畫
             </button>
           </div>
         </header>
@@ -350,9 +377,7 @@ const App: React.FC = () => {
               key={view.id}
               onClick={() => setActiveView(view.id as ViewType)}
               className={`flex items-center gap-2 px-5 md:px-8 py-2 md:py-3 rounded-xl md:rounded-[20px] font-bold transition-all flex-shrink-0 ${
-                activeView === view.id 
-                  ? 'bg-pink-500 text-white shadow-xl' 
-                  : 'text-pink-300 bg-white/50 hover:bg-pink-50'
+                activeView === view.id ? 'bg-pink-500 text-white shadow-xl translate-y-[-2px]' : 'text-pink-300 bg-white/50 hover:bg-pink-50'
               }`}
             >
               {view.icon} {view.label}
@@ -365,10 +390,7 @@ const App: React.FC = () => {
             <div className="space-y-8 md:space-y-12 animate-in fade-in duration-500">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
                 <ProgressBoard tasks={aggregatedTasks} />
-                <ProjectPrecautions 
-                  precautions={currentProject.precautions || []} 
-                  onUpdate={(items) => updateProject(currentProject.id, { precautions: items })}
-                />
+                <ProjectPrecautions precautions={currentProject.precautions || []} onUpdate={(items) => updateProject(currentProject.id, { precautions: items })} />
               </div>
               
               <div className="bg-white rounded-[32px] md:rounded-[40px] p-2 md:p-8 cute-shadow border border-pink-100">
@@ -378,7 +400,7 @@ const App: React.FC = () => {
               <div className="bg-white rounded-[32px] md:rounded-[40px] p-6 md:p-8 cute-shadow border border-pink-100">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
                   <h3 className="text-xl font-bold text-pink-600 flex items-center gap-3">
-                    <span className="p-2 bg-pink-100 rounded-xl"><Check size={20} /></span>
+                    <span className="p-2 bg-pink-100 rounded-xl text-pink-500"><Check size={20} /></span>
                     任務清單
                   </h3>
                   <button onClick={addTask} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-pink-50 text-pink-500 px-6 py-2.5 rounded-2xl font-bold hover:bg-pink-100 transition-all shadow-sm">
@@ -402,9 +424,7 @@ const App: React.FC = () => {
                       </div>
                     </div>
                   ))}
-                  {currentProject.tasks.length === 0 && (
-                     <div className="text-center py-12 text-pink-200 font-bold italic">這層專案還沒有任務喔 🧸</div>
-                  )}
+                  {currentProject.tasks.length === 0 && <div className="text-center py-12 text-pink-200 font-bold italic">這層專案還沒有任務喔 🧸</div>}
                 </div>
               </div>
 
@@ -414,15 +434,19 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {activeView === 'gantt' && <GanttChart tasks={aggregatedTasks} />}
-          {activeView === 'calendar' && <CalendarView tasks={aggregatedTasks} />}
-          {activeView === 'notes' && (
-            <NotesArea 
-              notes={currentProject.notes} 
-              logoUrl={currentProject.logoUrl}
-              onUpdateNotes={(notes) => updateProject(currentProject.id, { notes })}
-              onUpdateLogo={(url) => updateProject(currentProject.id, { logoUrl: url })}
-            />
+          {activeView !== 'dashboard' && (
+             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                {activeView === 'gantt' && <GanttChart tasks={aggregatedTasks} />}
+                {activeView === 'calendar' && <CalendarView tasks={aggregatedTasks} />}
+                {activeView === 'notes' && (
+                  <NotesArea 
+                    notes={currentProject.notes} 
+                    logoUrl={currentProject.logoUrl}
+                    onUpdateNotes={(notes) => updateProject(currentProject.id, { notes })}
+                    onUpdateLogo={(url) => updateProject(currentProject.id, { logoUrl: url })}
+                  />
+                )}
+             </div>
           )}
         </div>
       </main>
