@@ -21,13 +21,12 @@ import { getFirestore, doc, setDoc, onSnapshot } from 'firebase/firestore';
  * 🍓 請確認這裡已經換成你的 Firebase 配置 🍓
  */
 const firebaseConfig = {
-  apiKey: "AIzaSyApdW3VyiDJc9kJhvl6KC2IB4Q7HX6jBGM",
-  authDomain: "notion-35f2a.firebaseapp.com",
-  projectId: "notion-35f2a",
-  storageBucket: "notion-35f2a.firebasestorage.app",
-  messagingSenderId: "83841265274",
-  appId: "1:83841265274:web:40300f10e24f9f25add5c3",
-  measurementId: "G-4D3LMLMZ0Q"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_AUTH_DOMAIN",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_STORAGE_BUCKET",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
 
 const isConfigured = firebaseConfig.apiKey !== "YOUR_API_KEY";
@@ -182,6 +181,25 @@ const App: React.FC = () => {
     setSelectedProjectId(newProject.id);
   };
 
+  const deleteProject = (id: string) => {
+    if (projects.length === 1 && !projects[0].parentId) {
+      alert("至少需要保留一個計畫喔！🍭");
+      return;
+    }
+    if (!confirm('確定要刪除目前這個計畫嗎？ 🥺')) return;
+    const filter = (list: Project[]): Project[] => {
+      return list.filter(p => p.id !== id).map(p => ({
+        ...p,
+        children: filter(p.children)
+      }));
+    };
+    const newProjects = filter(projects);
+    updateProjectsState(newProjects);
+    if (selectedProjectId === id) {
+      setSelectedProjectId(newProjects[0]?.id || null);
+    }
+  };
+
   const handleLogin = async () => {
     if (!auth) return;
     const provider = new GoogleAuthProvider();
@@ -312,6 +330,16 @@ const App: React.FC = () => {
                 <button onClick={() => auth && signOut(auth)} className="text-[10px] font-bold text-pink-300 hover:text-red-400 transition-colors">登出</button>
               </div>
             )}
+
+            {/* 恢復垃圾桶刪除按鈕 */}
+            <button 
+              onClick={() => deleteProject(currentProject.id)}
+              className="p-2.5 bg-white text-pink-300 hover:text-red-400 rounded-xl border border-pink-50 shadow-sm transition-all hover:bg-red-50 active:scale-90"
+              title="刪除目前計畫"
+            >
+              <Trash2 size={20} />
+            </button>
+
             <button onClick={() => addProject(currentProject.id)} className="flex items-center gap-2 bg-pink-500 text-white px-4 md:px-6 py-2 rounded-xl md:rounded-2xl font-bold text-xs md:text-sm shadow-md hover:bg-pink-600 transition-all active:scale-95">
               <Plus size={16} /> 建立計畫
             </button>
