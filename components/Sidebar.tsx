@@ -1,10 +1,13 @@
 
 import React, { useState } from 'react';
-import { ChevronRight, ChevronDown, Plus, Heart, FolderHeart } from 'lucide-react';
+import { ChevronRight, ChevronDown, Plus, Heart, FolderHeart, Edit3 } from 'lucide-react';
 import { Project } from '../types.ts';
 
 interface SidebarProps {
   projects: Project[];
+  workspaceLogo: string;
+  workspaceName: string;
+  onUpdateWorkspace: (logo: string, name: string) => void;
   selectedProjectId: string | null;
   isOpen: boolean;
   onSelectProject: (id: string) => void;
@@ -68,7 +71,7 @@ const ProjectItem: React.FC<{
   );
 };
 
-export const Sidebar: React.FC<SidebarProps> = ({ projects, selectedProjectId, isOpen, onSelectProject, onAddProject }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ projects, workspaceLogo, workspaceName, onUpdateWorkspace, selectedProjectId, isOpen, onSelectProject, onAddProject }) => {
   return (
     <div className={`
       fixed inset-y-0 left-0 w-64 sanrio-pink h-screen flex flex-col p-6 border-r sanrio-border-pink z-50 transition-transform duration-300 shadow-xl
@@ -76,9 +79,42 @@ export const Sidebar: React.FC<SidebarProps> = ({ projects, selectedProjectId, i
       ${isOpen ? 'translate-x-0' : '-translate-x-full'}
     `}>
       <div className="flex items-center justify-between mb-10">
-        <h1 className="font-black text-2xl text-pink-600 flex items-center gap-2 italic tracking-tighter">
-          <span className="text-3xl not-italic">🍓</span> Melody
-        </h1>
+        <div className="flex items-center gap-2">
+          {/* Logo 編輯按鈕 */}
+          <div 
+            className="w-10 h-10 bg-white rounded-xl shadow-sm border border-pink-100 flex items-center justify-center relative overflow-hidden cursor-pointer group"
+            onClick={() => {
+              const newLogo = prompt('自訂標誌 (Emoji 或 圖片網址) 🍓', workspaceLogo);
+              if (newLogo) onUpdateWorkspace(newLogo, workspaceName);
+            }}
+          >
+            {workspaceLogo.startsWith('http') ? (
+              <img src={workspaceLogo} className="w-full h-full object-cover" alt="brand" />
+            ) : (
+              <span className="text-2xl">{workspaceLogo}</span>
+            )}
+            <div className="absolute inset-0 bg-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <Edit3 size={12} className="text-pink-500" />
+            </div>
+          </div>
+          
+          {/* 名稱編輯按鈕 */}
+          <div 
+            className="flex flex-col cursor-pointer group relative"
+            onClick={() => {
+              const newName = prompt('請輸入工作空間名稱 🍭', workspaceName);
+              if (newName) onUpdateWorkspace(workspaceLogo, newName);
+            }}
+          >
+            <h1 className="font-black text-2xl text-pink-600 italic tracking-tighter transition-all group-hover:text-pink-400">
+              {workspaceName}
+            </h1>
+            <div className="absolute -top-1 -right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+               <Edit3 size={10} className="text-pink-300" />
+            </div>
+          </div>
+        </div>
+
         <button 
           onClick={() => onAddProject(null)}
           className="p-2 bg-white/40 hover:bg-white rounded-xl transition-all shadow-sm border border-pink-100"
