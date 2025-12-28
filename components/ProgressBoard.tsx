@@ -1,71 +1,91 @@
 
 import React from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
-import { Task } from '../types';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { Task, TaskStatus } from '../types';
+import { COLORS } from '../constants.tsx';
 
 interface ProgressBoardProps {
   tasks: Task[];
 }
 
 export const ProgressBoard: React.FC<ProgressBoardProps> = ({ tasks }) => {
-  const averageProgress = tasks.length > 0 
-    ? Math.round(tasks.reduce((acc, t) => acc + t.progress, 0) / tasks.length)
-    : 0;
+  const stats = {
+    todo: tasks.filter(t => t.status === TaskStatus.TODO).length,
+    inProgress: tasks.filter(t => t.status === TaskStatus.IN_PROGRESS).length,
+    completed: tasks.filter(t => t.status === TaskStatus.COMPLETED).length,
+  };
 
-  const data = [
-    { name: 'Completed', value: averageProgress },
-    { name: 'Remaining', value: 100 - averageProgress },
-  ];
+  const unfinished = stats.todo + stats.inProgress;
+
+  const chartData = [
+    { name: '待處理', value: stats.todo, color: COLORS.status[TaskStatus.TODO] },
+    { name: '進行中', value: stats.inProgress, color: COLORS.status[TaskStatus.IN_PROGRESS] },
+    { name: '已完成', value: stats.completed, color: COLORS.status[TaskStatus.COMPLETED] },
+  ].filter(d => d.value > 0);
+
+  const total = tasks.length || 1;
+  const completedRate = Math.round((stats.completed / total) * 100);
 
   return (
-    <div className="bg-white rounded-[32px] md:rounded-[40px] p-6 md:p-8 cute-shadow border border-pink-100 flex flex-col sm:flex-row gap-6 md:gap-8 items-center h-full">
-      <div className="w-full sm:w-1/2 flex flex-col items-center">
-        <h3 className="text-lg md:text-xl font-bold text-blue-500 mb-6 flex items-center gap-2 self-start">
-          <span className="text-2xl">📊</span> 總體進度表
+    <div className="bg-white rounded-[32px] md:rounded-[40px] p-6 md:p-8 cute-shadow border border-pink-100 flex flex-col items-center h-full">
+      <div className="w-full flex items-center justify-between mb-6">
+        <h3 className="text-lg md:text-xl font-bold text-pink-600 flex items-center gap-2">
+          <span className="text-2xl">📊</span> 進度分佈
         </h3>
-        <div className="relative w-40 h-40 md:w-48 md:h-48">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={data}
-                innerRadius={60}
-                outerRadius={80}
-                startAngle={90}
-                endAngle={450}
-                dataKey="value"
-                stroke="none"
-              >
-                <Cell fill="#ff8ba7" />
-                <Cell fill="#e0f2f1" />
-              </Pie>
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-3xl md:text-4xl font-bold text-pink-500">{averageProgress}%</span>
-            <span className="text-[10px] md:text-xs text-pink-300 font-bold">總體進度</span>
-          </div>
+        <div className="px-3 py-1 bg-pink-50 rounded-full text-xs font-black text-pink-400">
+          共 {tasks.length} 個任務
         </div>
       </div>
 
-      <div className="w-full sm:w-1/2 space-y-4">
-        {tasks.slice(0, 4).map((task) => (
-          <div key={task.id} className="space-y-1">
-            <div className="flex justify-between text-xs md:text-sm font-bold text-[#5c4b51]">
-              <span className="truncate pr-2">{task.title}</span>
-              <span className="text-pink-400">{task.progress}%</span>
-            </div>
-            <div className="h-2.5 md:h-3 bg-pink-50 rounded-full overflow-hidden">
-              <div 
-                className="h-full rounded-full transition-all duration-700"
-                style={{ width: `${task.progress}%`, backgroundColor: task.color }}
-              />
-            </div>
+      <div className="flex flex-col sm:flex-row w-full gap-8 items-center justify-center">
+        <div className="relative w-48 h-48 md:w-56 md:h-56">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={chartData}
+                innerRadius={65}
+                outerRadius={85}
+                paddingAngle={5}
+                dataKey="value"
+                stroke="none"
+              >
+                {chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip />
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+            <span className="text-3xl md:text-4xl font-black text-pink-500">{completedRate}%</span>
+            <span className="text-[10px] md:text-xs text-pink-300 font-bold">完成率</span>
           </div>
-        ))}
-        {tasks.length === 0 && (
-          <div className="text-center py-10 text-pink-200 italic text-sm">尚無進度數據 🍓</div>
-        )}
+        </div>
+
+        <div className="flex-1 w-full space-y-3">
+          {[
+            { label: '待處理', count: stats.todo, color: COLORS.status[TaskStatus.TODO] },
+            { label: '進行中', count: stats.inProgress, color: COLORS.status[TaskStatus.IN_PROGRESS] },
+            { label: '已完成', count: stats.completed, color: COLORS.status[TaskStatus.COMPLETED] },
+            { label: '未完成', count: unfinished, color: '#bdbdbd' }, // 灰黑色代表未完成
+          ].map((item, idx) => (
+            <div key={idx} className="flex items-center justify-between p-3 rounded-2xl bg-gray-50/50 hover:bg-white transition-all border border-transparent hover:border-pink-50 group">
+              <div className="flex items-center gap-3">
+                <div className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: item.color }} />
+                <span className="text-sm font-bold text-[#5c4b51]">{item.label}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-black text-pink-400">{item.count}</span>
+                <span className="text-[10px] text-gray-300 font-bold">任務</span>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
+      
+      {tasks.length === 0 && (
+        <div className="mt-4 text-pink-200 italic text-sm">快去新增任務來填充圖表吧！🍓</div>
+      )}
     </div>
   );
 };

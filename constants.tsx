@@ -1,5 +1,5 @@
 
-import { TaskPriority, TaskStatus, Project } from './types';
+import { TaskPriority, TaskStatus, Project } from './types.ts';
 
 export const COLORS = {
   primary: '#ff85b2',
@@ -14,9 +14,14 @@ export const COLORS = {
     '#e1b8ff', // 紫
   ],
   priority: {
-    [TaskPriority.LOW]: '#b8e1ff',
-    [TaskPriority.MEDIUM]: '#fff7b8',
-    [TaskPriority.HIGH]: '#ffb8d1'
+    [TaskPriority.LOW]: '#e1f5fe',    // 淺藍
+    [TaskPriority.MEDIUM]: '#fff9c4', // 淺黃
+    [TaskPriority.HIGH]: '#ffebee'    // 淺紅
+  },
+  status: {
+    [TaskStatus.TODO]: '#ffcdd2',        // 粉紅 (待處理)
+    [TaskStatus.IN_PROGRESS]: '#ffe0b2',  // 粉橘 (進行中)
+    [TaskStatus.COMPLETED]: '#c8e6c9'     // 薄荷綠 (已完成)
   }
 };
 
