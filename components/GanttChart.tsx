@@ -2,6 +2,7 @@
 import React from 'react';
 import { format, eachDayOfInterval, addDays, differenceInDays } from 'date-fns';
 import { Task } from '../types.ts';
+import { COLORS } from '../constants.tsx';
 
 interface GanttChartProps {
   tasks: Task[];
@@ -62,6 +63,9 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks }) => {
               const width = Math.max((differenceInDays(end, start) + 1) * 35, 40);
               const duration = differenceInDays(end, start) + 1;
 
+              // 根據優先度獲取顏色
+              const priorityColor = COLORS.priority[task.priority] || '#f3f4f6';
+
               return (
                 <div key={task.id} className="flex group items-center">
                   <div className="w-32 md:w-48 flex-shrink-0">
@@ -70,19 +74,25 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks }) => {
                   </div>
                   <div className="flex-1 relative h-6 md:h-8">
                     <div 
-                      className="absolute top-0 h-5 md:h-6 rounded-full shadow-sm transition-transform group-hover:scale-[1.01] cursor-pointer flex items-center justify-end pr-2 md:pr-3"
+                      className="absolute top-0 h-5 md:h-6 rounded-full shadow-sm transition-transform group-hover:scale-[1.01] cursor-pointer flex items-center justify-end pr-2 md:pr-3 overflow-hidden"
                       style={{ 
                         left: `${left}px`, 
                         width: `${width}px`,
-                        backgroundColor: task.color + '33',
-                        border: `1.5px solid ${task.color}`
+                        backgroundColor: priorityColor, // 背景使用較淡的優先度顏色
+                        border: `1.5px solid ${priorityColor}`, // 邊框使用優先度顏色
+                        opacity: 0.9
                       }}
                     >
+                      {/* 進度條填滿部分 */}
                       <div 
-                        className="absolute left-0 top-0 h-full rounded-full transition-all duration-1000" 
-                        style={{ width: `${task.progress}%`, backgroundColor: task.color }} 
+                        className="absolute left-0 top-0 h-full rounded-full transition-all duration-1000 flex items-center shadow-inner" 
+                        style={{ 
+                          width: `${task.progress}%`, 
+                          backgroundColor: priorityColor,
+                          filter: 'brightness(0.9)' // 讓進度部分稍微深一點以示區別
+                        }} 
                       />
-                      <span className="relative z-10 text-[8px] md:text-[10px] font-bold text-[#5c4b51] drop-shadow-sm whitespace-nowrap">{duration}天</span>
+                      <span className="relative z-10 text-[8px] md:text-[10px] font-black text-[#5c4b51] drop-shadow-sm whitespace-nowrap">{duration}天</span>
                     </div>
                   </div>
                 </div>
