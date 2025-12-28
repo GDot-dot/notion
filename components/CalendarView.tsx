@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, startOfWeek, endOfWeek, addMonths, subMonths, addYears, subYears } from 'date-fns';
-import { zhTW } from 'date-fns/locale';
+import { format, endOfMonth, eachDayOfInterval, isSameMonth, isToday, endOfWeek, addMonths, addYears } from 'date-fns';
+// Import zhTW from subpath as barrel import from date-fns/locale was reported missing
+import { zhTW } from 'date-fns/locale/zh-TW';
 import { Task } from '../types';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 
@@ -12,9 +13,13 @@ interface CalendarViewProps {
 export const CalendarView: React.FC<CalendarViewProps> = ({ tasks }) => {
   const [viewDate, setViewDate] = useState(new Date());
   
-  const monthStart = startOfMonth(viewDate);
+  // Replace startOfMonth and startOfWeek with native Date logic as they were reported as missing exports
+  const monthStart = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
   const monthEnd = endOfMonth(viewDate);
-  const calendarStart = startOfWeek(monthStart);
+  
+  const calendarStart = new Date(monthStart);
+  calendarStart.setDate(monthStart.getDate() - monthStart.getDay());
+  
   const calendarEnd = endOfWeek(monthEnd);
 
   const days = eachDayOfInterval({
@@ -23,9 +28,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ tasks }) => {
   });
 
   const nextMonth = () => setViewDate(addMonths(viewDate, 1));
-  const prevMonth = () => setViewDate(subMonths(viewDate, 1));
+  // Replace subMonths with addMonths negative value as subMonths was reported as missing export
+  const prevMonth = () => setViewDate(addMonths(viewDate, -1));
   const nextYear = () => setViewDate(addYears(viewDate, 1));
-  const prevYear = () => setViewDate(subYears(viewDate, 1));
+  // Replace subYears with addYears negative value as subYears was reported as missing export
+  const prevYear = () => setViewDate(addYears(viewDate, -1));
 
   // 簡單的亮度檢查函數，決定文字該用黑色還是白色
   const getContrastYIQ = (hexcolor: string) => {

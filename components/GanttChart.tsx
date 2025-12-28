@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { format, eachDayOfInterval, isSameDay, addDays, startOfDay, differenceInDays, min, max } from 'date-fns';
+import { format, eachDayOfInterval, isSameDay, addDays, differenceInDays } from 'date-fns';
 import { Task } from '../types';
 
 interface GanttChartProps {
@@ -18,8 +18,14 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks }) => {
 
   // 自動找出任務涵蓋的日期範圍
   const allDates = tasks.flatMap(t => [new Date(t.startDate), new Date(t.endDate)]);
-  const rangeStart = startOfDay(min(allDates));
-  const rangeEnd = addDays(max(allDates), 14);
+  // Replace startOfDay, min, and max with native JS logic as they are reported missing from the imported date-fns package
+  const minTime = Math.min(...allDates.map(d => d.getTime()));
+  const maxTime = Math.max(...allDates.map(d => d.getTime()));
+  
+  const rangeStart = new Date(minTime);
+  rangeStart.setHours(0, 0, 0, 0);
+  
+  const rangeEnd = addDays(new Date(maxTime), 14);
   
   const allDays = eachDayOfInterval({ start: rangeStart, end: rangeEnd });
   
@@ -52,8 +58,12 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks }) => {
           {/* 任務行 */}
           <div className="space-y-6">
             {tasks.map((task) => {
-              const start = startOfDay(new Date(task.startDate));
-              const end = startOfDay(new Date(task.endDate));
+              // Replace startOfDay with native Date manipulation
+              const start = new Date(task.startDate);
+              start.setHours(0, 0, 0, 0);
+              const end = new Date(task.endDate);
+              end.setHours(0, 0, 0, 0);
+              
               const left = differenceInDays(start, rangeStart) * 35;
               const width = (differenceInDays(end, start) + 1) * 35;
               const duration = differenceInDays(end, start) + 1;

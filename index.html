@@ -4,13 +4,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sanrio Style Project Manager</title>
+  <title>Melody Project Manager</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Kosugi+Maru&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
     body {
       font-family: 'Noto Sans TC', 'Kosugi Maru', sans-serif;
       background-color: #fff5f8;
+      overflow-x: hidden;
     }
     .sanrio-pink { background-color: #ffdeeb; }
     .sanrio-text-pink { color: #ff85b2; }
@@ -20,24 +21,29 @@
     ::-webkit-scrollbar-track { background: #fff5f8; }
     ::-webkit-scrollbar-thumb { background: #ffb8d1; border-radius: 10px; }
     ::-webkit-scrollbar-thumb:hover { background: #ff85b2; }
+    
+    /* 防止行動端點擊閃爍 */
+    * { -webkit-tap-highlight-color: transparent; }
   </style>
-<script type="importmap">
-{
-  "imports": {
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3",
-    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
-    "date-fns/": "https://esm.sh/date-fns@^4.1.0/",
-    "date-fns": "https://esm.sh/date-fns@^4.1.0",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "recharts": "https://esm.sh/recharts@^3.6.0"
+  <script type="importmap">
+  {
+    "imports": {
+      "react/": "https://esm.sh/react@^19.2.3/",
+      "react": "https://esm.sh/react@^19.2.3",
+      "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+      "date-fns/": "https://esm.sh/date-fns@^4.1.0/",
+      "date-fns": "https://esm.sh/date-fns@^4.1.0",
+      "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+      "recharts": "https://esm.sh/recharts@^3.6.0"
+    }
   }
-}
-</script>
+  </script>
 <link rel="stylesheet" href="/index.css">
 </head>
 <body>
   <div id="root"></div>
+  <!-- 明確引用 index.tsx，使用相對路徑修復 GitHub Pages 404 -->
+  <script type="module" src="./index.tsx"></script>
 <script type="module" src="/index.tsx"></script>
 </body>
 </html>
