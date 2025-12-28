@@ -21,12 +21,13 @@ import { getFirestore, doc, setDoc, onSnapshot } from 'firebase/firestore';
  * 🍓 請確認這裡已經換成你的 Firebase 配置 🍓
  */
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyApdW3VyiDJc9kJhvl6KC2IB4Q7HX6jBGM",
+  authDomain: "notion-35f2a.firebaseapp.com",
+  projectId: "notion-35f2a",
+  storageBucket: "notion-35f2a.firebasestorage.app",
+  messagingSenderId: "83841265274",
+  appId: "1:83841265274:web:40300f10e24f9f25add5c3",
+  measurementId: "G-4D3LMLMZ0Q"
 };
 
 const isConfigured = firebaseConfig.apiKey !== "YOUR_API_KEY";
