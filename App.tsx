@@ -201,6 +201,20 @@ const App: React.FC = () => {
     }
   };
 
+  const deleteTask = (taskId: string) => {
+    if (!confirm('確定要刪除這個任務嗎？ 🍬')) return;
+    const findAndRemover = (list: Project[]): Project[] => {
+      return list.map(p => {
+        const taskIdx = p.tasks.findIndex(t => t.id === taskId);
+        if (taskIdx !== -1) {
+          return { ...p, tasks: p.tasks.filter(t => t.id !== taskId) };
+        }
+        return { ...p, children: findAndRemover(p.children) };
+      });
+    };
+    updateProjectsState(findAndRemover(projects));
+  };
+
   const handleLogin = async () => {
     if (!auth) return;
     const provider = new GoogleAuthProvider();
@@ -332,7 +346,6 @@ const App: React.FC = () => {
               </div>
             )}
 
-            {/* 恢復垃圾桶刪除按鈕 */}
             <button 
               onClick={() => deleteProject(currentProject.id)}
               className="p-2.5 bg-white text-pink-300 hover:text-red-400 rounded-xl border border-pink-50 shadow-sm transition-all hover:bg-red-50 active:scale-90"
@@ -397,9 +410,21 @@ const App: React.FC = () => {
                       <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
                         <div className="px-3 py-1 rounded-full text-[10px] font-black border border-white/50 shadow-sm" style={{ backgroundColor: COLORS.status[task.status] }}>{task.status}</div>
                         <span className="text-sm font-bold text-pink-500 min-w-[32px]">{task.progress}%</span>
+                        {/* 刪除任務按鈕 */}
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }}
+                          className="p-2 text-pink-200 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-50 rounded-xl"
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </div>
                     </div>
                   ))}
+                  {currentProject.tasks.length === 0 && (
+                    <div className="text-center py-12 text-pink-200 font-bold italic border-2 border-dashed border-pink-50 rounded-3xl">
+                      還沒有任務喔，點擊上方按鈕新增一個吧！🍭
+                    </div>
+                  )}
                 </div>
               </div>
               <CalendarView tasks={aggregatedTasks} />
