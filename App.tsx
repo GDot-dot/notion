@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Routes, Route, Navigate, useParams, useNavigate } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar.tsx';
 import { GanttChart } from './components/GanttChart.tsx';
@@ -13,10 +13,106 @@ import { COLORS } from './constants.tsx';
 import { useProjects } from './context/ProjectContext.tsx';
 import { auth, googleProvider, isConfigured } from './lib/firebase.ts';
 import { signInWithPopup, signOut } from 'firebase/auth';
-import { Plus, LayoutDashboard, Calendar, BarChart2, BookOpen, Trash2, Check, Edit3, Menu, LogIn, ShieldAlert, Loader2, Save, CloudCheck } from 'lucide-react';
+import { Plus, LayoutDashboard, Calendar, BarChart2, BookOpen, Trash2, Check, Edit3, Menu, LogIn, ShieldAlert, Loader2, Save, CloudCheck, Search, X, FolderHeart } from 'lucide-react';
 import { addDays } from 'date-fns';
 
-// 🍓 效能優化：使用 React.memo 包裝單個任務項，防止列表更新時不必要的重繪
+// 🍓 搜尋面板組件
+const SearchPalette: React.FC<{ 
+  projects: Project[], 
+  onClose: () => void, 
+  onSelect: (id: string, type: 'project' | 'task') => void 
+}> = ({ projects, onClose, onSelect }) => {
+  const [query, setQuery] = useState('');
+  
+  const searchResults = useMemo(() => {
+    if (!query.trim()) return { projects: [], tasks: [] };
+    const q = query.toLowerCase();
+    const pResults: Project[] = [];
+    const tResults: { task: Task, projectId: string }[] = [];
+
+    const searchRecursive = (list: Project[]) => {
+      list.forEach(p => {
+        if (p.name.toLowerCase().includes(q)) pResults.push(p);
+        p.tasks.forEach(t => {
+          if (t.title.toLowerCase().includes(q) || t.description.toLowerCase().includes(q)) {
+            tResults.push({ task: t, projectId: p.id });
+          }
+        });
+        searchRecursive(p.children);
+      });
+    };
+    searchRecursive(projects);
+    return { projects: pResults, tasks: tResults };
+  }, [query, projects]);
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh] p-4 bg-pink-900/10 backdrop-blur-md animate-in fade-in duration-300" onClick={onClose}>
+      <div className="w-full max-w-2xl bg-white rounded-[32px] shadow-2xl overflow-hidden border border-pink-100 flex flex-col max-h-[60vh] animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-4 p-6 border-b border-pink-50">
+          <Search className="text-pink-400" />
+          <input 
+            autoFocus
+            placeholder="搜尋計畫名稱或任務內容..."
+            className="flex-1 bg-transparent border-none text-xl font-bold text-[#5c4b51] focus:outline-none placeholder:text-pink-200"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+          />
+          <kbd className="hidden sm:inline-block px-2 py-1 bg-pink-50 text-pink-300 text-[10px] rounded-lg font-bold">ESC</kbd>
+        </div>
+        
+        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+          {query.trim() === '' ? (
+            <div className="text-center py-20 opacity-30">
+              <Search size={48} className="mx-auto mb-4" />
+              <p className="font-bold">輸入關鍵字開始搜尋 🍰</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {searchResults.projects.length > 0 && (
+                <div>
+                  <h4 className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-3 ml-2">計畫項目 / Projects</h4>
+                  <div className="space-y-1">
+                    {searchResults.projects.map(p => (
+                      <div key={p.id} onClick={() => onSelect(p.id, 'project')} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-pink-50 cursor-pointer transition-colors group">
+                        <div className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center border border-pink-50 group-hover:border-pink-200">
+                          {p.logoUrl?.length === 2 ? p.logoUrl : <FolderHeart size={16} className="text-pink-400" />}
+                        </div>
+                        <span className="font-bold text-[#5c4b51]">{p.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {searchResults.tasks.length > 0 && (
+                <div>
+                  <h4 className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-3 ml-2">任務項目 / Tasks</h4>
+                  <div className="space-y-1">
+                    {searchResults.tasks.map(({ task, projectId }) => (
+                      <div key={task.id} onClick={() => onSelect(projectId, 'task')} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-pink-50 cursor-pointer transition-colors group">
+                        <div className="w-8 h-8 rounded-lg border-2 border-pink-200 flex items-center justify-center text-[10px] font-black text-pink-400 bg-white">
+                          {task.progress}%
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="font-bold text-[#5c4b51] text-sm">{task.title}</span>
+                          <span className="text-[10px] text-pink-300">所屬計畫 ID: {projectId.slice(0, 8)}...</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {searchResults.projects.length === 0 && searchResults.tasks.length === 0 && (
+                <div className="text-center py-10 opacity-30 font-bold">找不到相關內容 🥺</div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// 🍓 任務項
 const TaskItem = React.memo(({ task, onToggleStatus, onEdit, onDelete }: { 
   task: Task, 
   onToggleStatus: () => void, 
@@ -56,6 +152,7 @@ const ProjectView: React.FC = () => {
   const navigate = useNavigate();
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   // 輔助函式：在樹狀結構中尋找專案
   const findProject = useCallback((id: string, list: Project[]): Project | null => {
@@ -70,6 +167,22 @@ const ProjectView: React.FC = () => {
   const currentProject = useMemo(() => {
     return (projectId ? findProject(projectId, state.projects) : null) || state.projects[0];
   }, [projectId, state.projects, findProject]);
+
+  // 🍓 追蹤最近存取時間
+  useEffect(() => {
+    if (currentProject) {
+      const now = new Date().toISOString();
+      if (currentProject.lastAccessedAt && (new Date().getTime() - new Date(currentProject.lastAccessedAt).getTime() < 1000 * 60)) return;
+      
+      const updater = (list: Project[]): Project[] => list.map(p => {
+        if (p.id === currentProject.id) return { ...p, lastAccessedAt: now };
+        return { ...p, children: updater(p.children) };
+      });
+      const next = updater(state.projects);
+      dispatch({ type: 'UPDATE_PROJECTS', projects: next });
+      // 同步但不更新 Loading，所以不呼叫 syncToCloud(next) 以免太頻繁，可等下次操作
+    }
+  }, [currentProject?.id]);
 
   const activeView = (view || 'dashboard') as ViewType;
 
@@ -228,7 +341,7 @@ const ProjectView: React.FC = () => {
               if (res !== null) updateProject(currentProject.id, { logoUrl: res });
             }}>
               <div className="w-12 h-12 md:w-20 md:h-20 bg-white rounded-2xl md:rounded-[32px] flex items-center justify-center text-2xl md:text-5xl shadow-inner border-2 border-pink-100 overflow-hidden">
-                {currentProject.logoUrl?.startsWith('http') ? <img src={currentProject.logoUrl} className="w-full h-full object-cover" /> : (currentProject.logoUrl || '📁')}
+                {currentProject.logoUrl?.startsWith('http') || currentProject.logoUrl?.startsWith('blob') ? <img src={currentProject.logoUrl} className="w-full h-full object-cover" /> : (currentProject.logoUrl || '📁')}
               </div>
               <div className="absolute -bottom-1 -right-1 bg-pink-500 p-1.5 rounded-full shadow-md border-2 border-white transition-transform group-hover:scale-110"><Edit3 size={12} className="text-white" /></div>
             </div>
@@ -245,6 +358,12 @@ const ProjectView: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-2 md:gap-4">
+            <button 
+              onClick={() => setIsSearchOpen(true)}
+              className="p-2.5 bg-white text-pink-400 hover:text-pink-600 rounded-xl border border-pink-50 shadow-sm hover:bg-pink-50 transition-all flex items-center gap-2"
+            >
+              <Search size={20} /> <span className="hidden sm:inline font-bold text-sm">搜尋</span>
+            </button>
             {!state.user ? (
               <button onClick={() => auth && signInWithPopup(auth, googleProvider)} className="flex items-center gap-2 bg-white text-blue-500 px-4 py-2 rounded-xl font-bold text-sm shadow-md border border-blue-50 hover:bg-blue-50 active:scale-95 transition-all">
                 <LogIn size={18} /> Google 登入
@@ -322,6 +441,17 @@ const ProjectView: React.FC = () => {
           )}
         </div>
       </main>
+
+      {isSearchOpen && (
+        <SearchPalette 
+          projects={state.projects} 
+          onClose={() => setIsSearchOpen(false)} 
+          onSelect={(id, type) => {
+            navigate(`/project/${id}/dashboard`);
+            setIsSearchOpen(false);
+          }}
+        />
+      )}
 
       {editingTaskId && aggregatedTasks.find(t => t.id === editingTaskId) && (
         <TaskDetailModal 

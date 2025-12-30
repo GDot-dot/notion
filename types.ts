@@ -29,11 +29,12 @@ export interface Project {
   name: string;
   logoUrl?: string;
   notes: string;
-  precautions: string[]; // 專案注意事項小叮嚀
-  precautionsColor?: string; // 注意事項區域的背景顏色
+  precautions: string[];
+  precautionsColor?: string;
   tasks: Task[];
   children: Project[];
   parentId: string | null;
+  lastAccessedAt?: string; // 最近一次查看的時間戳
 }
 
 export type ViewType = 'dashboard' | 'gantt' | 'calendar' | 'notes';

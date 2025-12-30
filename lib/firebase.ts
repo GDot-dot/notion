@@ -3,9 +3,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
-/**
- * 🍓 請替換為您的 Firebase 配置 🍓
- */
+
 const firebaseConfig = {
   apiKey: "AIzaSyApdW3VyiDJc9kJhvl6KC2IB4Q7HX6jBGM",
   authDomain: "notion-35f2a.firebaseapp.com",

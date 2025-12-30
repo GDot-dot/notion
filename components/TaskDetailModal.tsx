@@ -1,9 +1,11 @@
 
-import React from 'react';
-import { X, Calendar, Flag, AlignLeft, CheckCircle2, Link as LinkIcon } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Calendar, Flag, AlignLeft, CheckCircle2, Eye, Edit3 } from 'lucide-react';
 import { Task, TaskPriority, TaskStatus, Project } from '../types.ts';
 import { COLORS } from '../constants.tsx';
 import { format } from 'date-fns';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface TaskDetailModalProps {
   task: Task;
@@ -13,12 +15,7 @@ interface TaskDetailModalProps {
 }
 
 export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, allProjects, onClose, onUpdate }) => {
-  const flattenProjects = (projs: Project[]): Project[] => {
-    return projs.reduce((acc: Project[], curr) => {
-      return [...acc, curr, ...flattenProjects(curr.children)];
-    }, []);
-  };
-  const flatProjectList = flattenProjects(allProjects);
+  const [isPreview, setIsPreview] = useState(false);
 
   return (
     <div className="fixed inset-0 z-[60] flex justify-end bg-black/20 backdrop-blur-sm animate-in fade-in duration-300">
@@ -63,11 +60,11 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, allProje
                     progress: newStatus === TaskStatus.COMPLETED ? 100 : task.progress
                   });
                 }}
-                className="w-full p-3 rounded-2xl border-none text-sm font-bold text-[#5c4b51] focus:outline-none focus:ring-4 focus:ring-pink-100 transition-all shadow-sm"
+                className="w-full p-3 rounded-2xl border-none text-sm font-bold text-[#5c4b51] focus:outline-none focus:ring-4 focus:ring-pink-100 transition-all shadow-sm cursor-pointer"
                 style={{ backgroundColor: COLORS.status[task.status] + '66' }}
               >
                 {Object.values(TaskStatus).map(s => (
-                  <option key={s} value={s} style={{ backgroundColor: '#fff' }}>{s}</option>
+                  <option key={s} value={s} className="bg-white">{s}</option>
                 ))}
               </select>
             </div>
@@ -78,11 +75,11 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, allProje
               <select 
                 value={task.priority}
                 onChange={(e) => onUpdate({ priority: e.target.value as TaskPriority })}
-                className="w-full p-3 rounded-2xl border-none text-sm font-bold text-[#5c4b51] focus:outline-none focus:ring-4 focus:ring-pink-100 transition-all shadow-sm"
+                className="w-full p-3 rounded-2xl border-none text-sm font-bold text-[#5c4b51] focus:outline-none focus:ring-4 focus:ring-pink-100 transition-all shadow-sm cursor-pointer"
                 style={{ backgroundColor: COLORS.priority[task.priority] }}
               >
                 {Object.values(TaskPriority).map(p => (
-                  <option key={p} value={p} style={{ backgroundColor: '#fff' }}>{p}</option>
+                  <option key={p} value={p} className="bg-white">{p}</option>
                 ))}
               </select>
             </div>
@@ -115,26 +112,42 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, allProje
 
           <div className="space-y-3">
             <div className="flex justify-between items-center">
-              <label className="text-xs font-bold text-pink-300 uppercase tracking-wider">當前完成進度</label>
+              <label className="text-xs font-bold text-pink-300 uppercase tracking-wider">完成進度</label>
               <span className="text-sm font-bold text-pink-500">{task.progress}%</span>
             </div>
             <input 
               type="range" min="0" max="100" value={task.progress}
               onChange={(e) => onUpdate({ progress: parseInt(e.target.value) })}
-              className="w-full h-2 bg-pink-100 rounded-lg appearance-none cursor-pointer accent-pink-400"
+              className="w-full h-2 bg-pink-100 rounded-lg appearance-none cursor-pointer accent-pink-400 shadow-inner"
             />
           </div>
 
           <div className="space-y-2 flex-1 flex flex-col">
-            <label className="text-xs font-bold text-pink-300 flex items-center gap-1 uppercase tracking-wider">
-              <AlignLeft size={12} /> 內容與注意事項
-            </label>
-            <textarea
-              value={task.description}
-              onChange={(e) => onUpdate({ description: e.target.value })}
-              placeholder="在這裡輸入任務筆記、詳細步驟或注意事項..."
-              className="w-full flex-1 p-5 rounded-[30px] bg-pink-50/30 border border-pink-50 text-[#5c4b51] text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-pink-200 min-h-[180px] resize-none"
-            />
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-pink-300 flex items-center gap-1 uppercase tracking-wider">
+                <AlignLeft size={12} /> 內容與注意事項
+              </label>
+              <button 
+                onClick={() => setIsPreview(!isPreview)}
+                className="text-[10px] font-bold px-2 py-1 rounded-lg bg-pink-50 text-pink-400 hover:bg-pink-100 transition-colors flex items-center gap-1"
+              >
+                {isPreview ? <><Edit3 size={10} /> 編輯模式</> : <><Eye size={10} /> 預覽 Markdown</>}
+              </button>
+            </div>
+            {isPreview ? (
+              <div className="w-full flex-1 p-6 rounded-[30px] bg-pink-50/10 border border-pink-50 prose max-w-none overflow-y-auto min-h-[180px]">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {task.description || "*尚無備註內容*"}
+                </ReactMarkdown>
+              </div>
+            ) : (
+              <textarea
+                value={task.description}
+                onChange={(e) => onUpdate({ description: e.target.value })}
+                placeholder="在這裡輸入任務筆記、詳細步驟或注意事項 (支援 Markdown)..."
+                className="w-full flex-1 p-6 rounded-[30px] bg-pink-50/30 border border-pink-50 text-[#5c4b51] text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-pink-200 min-h-[180px] resize-none font-mono"
+              />
+            )}
           </div>
         </div>
 
