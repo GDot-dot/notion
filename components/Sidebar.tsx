@@ -28,7 +28,7 @@ const ProjectItem: React.FC<{
     const url = project.logoUrl;
     if (!url || url === '📁') return <FolderHeart size={16} className={isSelected ? 'text-pink-500' : 'text-pink-300'} />;
     if (url.startsWith('http')) {
-      return <img src={url} className="w-5 h-5 rounded-md object-cover shadow-sm border border-white" alt="logo" />;
+      return <img src={url} className="w-5 h-5 rounded-md object-cover shadow-sm border border-white" />;
     }
     return <span className="text-base">{url}</span>;
   };
@@ -41,30 +41,14 @@ const ProjectItem: React.FC<{
         onClick={() => onSelectProject(project.id)}
       >
         <div onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }} className="text-pink-300 p-0.5 hover:bg-pink-100 rounded-md">
-          {project.children.length > 0 ? (
-            isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />
-          ) : (
-            <div className="w-3.5" />
-          )}
+          {project.children.length > 0 ? (isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : <div className="w-3.5" />}
         </div>
-        <div className="flex-shrink-0 w-5 h-5 flex items-center justify-center">
-          {renderLogo()}
-        </div>
+        <div className="flex-shrink-0 w-5 h-5 flex items-center justify-center">{renderLogo()}</div>
         <span className="truncate text-sm text-[#5c4b51]">{project.name}</span>
       </div>
-      
       {isOpen && project.children.length > 0 && (
         <div className="flex flex-col">
-          {project.children.map(child => (
-            <ProjectItem 
-              key={child.id} 
-              project={child} 
-              level={level + 1} 
-              selectedProjectId={selectedProjectId}
-              onSelectProject={onSelectProject}
-              onAddProject={onAddProject}
-            />
-          ))}
+          {project.children.map(child => <ProjectItem key={child.id} project={child} level={level + 1} selectedProjectId={selectedProjectId} onSelectProject={onSelectProject} onAddProject={onAddProject} />)}
         </div>
       )}
     </div>
@@ -73,71 +57,23 @@ const ProjectItem: React.FC<{
 
 export const Sidebar: React.FC<SidebarProps> = ({ projects, workspaceLogo, workspaceName, onUpdateWorkspace, selectedProjectId, isOpen, onSelectProject, onAddProject }) => {
   return (
-    <div className={`
-      fixed inset-y-0 left-0 w-64 sanrio-pink h-screen flex flex-col p-6 border-r sanrio-border-pink z-50 transition-transform duration-300 shadow-xl
-      md:relative md:translate-x-0
-      ${isOpen ? 'translate-x-0' : '-translate-x-full'}
-    `}>
+    <div className={`fixed inset-y-0 left-0 w-64 sanrio-pink h-screen flex flex-col p-6 border-r sanrio-border-pink z-50 transition-transform duration-300 shadow-xl md:relative md:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
       <div className="flex items-center justify-between mb-10">
         <div className="flex items-center gap-2">
-          {/* Logo 編輯按鈕 */}
-          <div 
-            className="w-10 h-10 bg-white rounded-xl shadow-sm border border-pink-100 flex items-center justify-center relative overflow-hidden cursor-pointer group"
-            onClick={() => {
-              const newLogo = prompt('自訂標誌 (Emoji 或 圖片網址) 🍓', workspaceLogo);
-              if (newLogo) onUpdateWorkspace(newLogo, workspaceName);
-            }}
-          >
-            {workspaceLogo.startsWith('http') ? (
-              <img src={workspaceLogo} className="w-full h-full object-cover" alt="brand" />
-            ) : (
-              <span className="text-2xl">{workspaceLogo}</span>
-            )}
-            <div className="absolute inset-0 bg-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-              <Edit3 size={12} className="text-pink-500" />
-            </div>
+          <div className="w-10 h-10 bg-white rounded-xl shadow-sm border border-pink-100 flex items-center justify-center relative overflow-hidden cursor-pointer group" onClick={() => { const res = prompt('自訂標誌 🍓', workspaceLogo); if (res) onUpdateWorkspace(res, workspaceName); }}>
+            {workspaceLogo.startsWith('http') ? <img src={workspaceLogo} className="w-full h-full object-cover" /> : <span className="text-2xl">{workspaceLogo}</span>}
+            <div className="absolute inset-0 bg-pink-500/10 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"><Edit3 size={12} className="text-pink-500" /></div>
           </div>
-          
-          {/* 名稱編輯按鈕 */}
-          <div 
-            className="flex flex-col cursor-pointer group relative"
-            onClick={() => {
-              const newName = prompt('請輸入工作空間名稱 🍭', workspaceName);
-              if (newName) onUpdateWorkspace(workspaceLogo, newName);
-            }}
-          >
-            <h1 className="font-black text-2xl text-pink-600 italic tracking-tighter transition-all group-hover:text-pink-400">
-              {workspaceName}
-            </h1>
-            <div className="absolute -top-1 -right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-               <Edit3 size={10} className="text-pink-300" />
-            </div>
+          <div className="flex flex-col cursor-pointer group relative" onClick={() => { const res = prompt('請輸入工作空間名稱 🍭', workspaceName); if (res) onUpdateWorkspace(workspaceLogo, res); }}>
+            <h1 className="font-black text-2xl text-pink-600 italic tracking-tighter transition-all group-hover:text-pink-400">{workspaceName}</h1>
           </div>
         </div>
-
-        <button 
-          onClick={() => onAddProject(null)}
-          className="p-2 bg-white/40 hover:bg-white rounded-xl transition-all shadow-sm border border-pink-100"
-          title="新增根計畫"
-        >
-          <Plus size={18} className="text-pink-500" />
-        </button>
+        <button onClick={() => onAddProject(null)} className="p-2 bg-white/40 hover:bg-white rounded-xl transition-all shadow-sm border border-pink-100"><Plus size={18} className="text-pink-500" /></button>
       </div>
-
       <nav className="flex-1 space-y-1 overflow-y-auto no-scrollbar pr-1">
         <div className="text-[10px] font-black text-pink-400 uppercase tracking-[0.2em] mb-4 ml-3 opacity-60">計畫空間 / Projects</div>
-        {projects.map(project => (
-          <ProjectItem 
-            key={project.id} 
-            project={project} 
-            level={0} 
-            selectedProjectId={selectedProjectId}
-            onSelectProject={onSelectProject}
-            onAddProject={onAddProject}
-          />
-        ))}
+        {projects.map(project => <ProjectItem key={project.id} project={project} level={0} selectedProjectId={selectedProjectId} onSelectProject={onSelectProject} onAddProject={onAddProject} />)}
       </nav>
-
       <div className="mt-auto pt-6 border-t sanrio-border-pink text-xs text-pink-300 text-center flex flex-col items-center gap-2">
         <Heart size={14} className="fill-pink-200 text-pink-200 animate-pulse" />
         <span className="font-black tracking-widest uppercase opacity-40">Sync with Cloud</span>
