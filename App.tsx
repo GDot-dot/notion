@@ -21,7 +21,6 @@ const ProjectView: React.FC = () => {
   const navigate = useNavigate();
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  
   const [activeTagId, setActiveTagId] = useState<string | null>(null);
 
   const findProject = useCallback((id: string, list: Project[]): Project | null => {
@@ -40,14 +39,55 @@ const ProjectView: React.FC = () => {
   // 🍓 追蹤最近存取時間
   useEffect(() => {
     if (currentProject && projectId) {
-      // 避免重複更新導致效能問題，僅在時間落後超過 1 分鐘時更新
       const last = currentProject.lastAccessedAt ? new Date(currentProject.lastAccessedAt).getTime() : 0;
       const now = Date.now();
-      if (now - last > 60000) {
+      if (now - last > 30000) { // 30秒更新一次
         updateProject(currentProject.id, { lastAccessedAt: new Date().toISOString() });
       }
     }
   }, [projectId]);
+
+  const updateProject = (id: string, updates: Partial<Project>) => {
+    const updater = (list: Project[]): Project[] => list.map(p => {
+      if (p.id === id) return { ...p, ...updates };
+      return { ...p, children: updater(p.children) };
+    });
+    const next = updater(state.projects);
+    dispatch({ type: 'UPDATE_PROJECTS', projects: next });
+    syncToCloud(next);
+  };
+
+  const addNewProject = (parentId: string | null = null) => {
+    const name = prompt(parentId ? "📁 請輸入子專案名稱" : "🍓 請輸入新計畫名稱");
+    if (!name) return;
+    
+    const newProj: Project = {
+      id: Math.random().toString(36).substr(2, 9),
+      name,
+      parentId,
+      notes: `# ${name} 🎀`,
+      logoUrl: parentId ? '📁' : '🍓',
+      precautions: [],
+      tasks: [],
+      children: [],
+      lastAccessedAt: new Date().toISOString()
+    };
+
+    let next: Project[];
+    if (parentId === null) {
+      next = [...state.projects, newProj];
+    } else {
+      const insertInTree = (list: Project[]): Project[] => list.map(p => {
+        if (p.id === parentId) return { ...p, children: [...p.children, newProj] };
+        return { ...p, children: insertInTree(p.children) };
+      });
+      next = insertInTree(state.projects);
+    }
+
+    dispatch({ type: 'UPDATE_PROJECTS', projects: next });
+    syncToCloud(next);
+    navigate(`/project/${newProj.id}/dashboard`);
+  };
 
   const getAggregatedTasks = useCallback((proj: Project): Task[] => {
     let tasks = [...proj.tasks];
@@ -61,6 +101,11 @@ const ProjectView: React.FC = () => {
     return currentProject ? getAggregatedTasks(currentProject) : [];
   }, [currentProject, getAggregatedTasks]);
 
+  const filteredTasks = useMemo(() => {
+    if (!activeTagId) return allTasks;
+    return allTasks.filter(t => t.tags?.some(tag => tag.id === activeTagId));
+  }, [allTasks, activeTagId]);
+
   const availableTags = useMemo(() => {
     const tagsMap = new Map<string, Tag>();
     allTasks.forEach(t => {
@@ -68,84 +113,6 @@ const ProjectView: React.FC = () => {
     });
     return Array.from(tagsMap.values());
   }, [allTasks]);
-
-  const filteredTasks = useMemo(() => {
-    if (!activeTagId) return allTasks;
-    return allTasks.filter(t => t.tags?.some(tag => tag.id === activeTagId));
-  }, [allTasks, activeTagId]);
-
-  const updateProject = (id: string, updates: Partial<Project>) => {
-    const updater = (list: Project[]): Project[] => list.map(p => {
-      if (p.id === id) return { ...p, ...updates };
-      return { ...p, children: updater(p.children) };
-    });
-    const next = updater(state.projects);
-    dispatch({ type: 'UPDATE_PROJECTS', projects: next });
-    syncToCloud(next);
-  };
-
-  const deleteCurrentProject = () => {
-    if (!currentProject) return;
-    if (!confirm(`確定要刪除「${currentProject.name}」專案嗎？此動作無法復原 🍰`)) return;
-    
-    const remover = (list: Project[]): Project[] => {
-      return list.filter(p => p.id !== currentProject.id).map(p => ({
-        ...p,
-        children: remover(p.children)
-      }));
-    };
-    const next = remover(state.projects);
-    dispatch({ type: 'UPDATE_PROJECTS', projects: next });
-    syncToCloud(next);
-    navigate('/');
-  };
-
-  const updateTask = (taskId: string, updates: Partial<Task>) => {
-    const updater = (list: Project[]): Project[] => list.map(p => {
-      const idx = p.tasks.findIndex(t => t.id === taskId);
-      if (idx !== -1) {
-        const ts = [...p.tasks];
-        ts[idx] = { ...ts[idx], ...updates };
-        return { ...p, tasks: ts };
-      }
-      return { ...p, children: updater(p.children) };
-    });
-    const next = updater(state.projects);
-    dispatch({ type: 'UPDATE_PROJECTS', projects: next });
-    syncToCloud(next);
-  };
-
-  const deleteTask = (taskId: string) => {
-    if (!confirm('確定要刪除這個任務嗎？ 🍬')) return;
-    const remover = (list: Project[]): Project[] => list.map(p => ({
-      ...p,
-      tasks: p.tasks.filter(t => t.id !== taskId),
-      children: remover(p.children)
-    }));
-    const next = remover(state.projects);
-    dispatch({ type: 'UPDATE_PROJECTS', projects: next });
-    syncToCloud(next);
-  };
-
-  const addNewProject = () => {
-    const name = prompt("🍓 請輸入新專案名稱");
-    if (!name) return;
-    const newProj: Project = {
-      id: Math.random().toString(36).substr(2, 9),
-      name,
-      parentId: null,
-      notes: '# 新計畫 🎀',
-      logoUrl: '🍓',
-      precautions: [],
-      tasks: [],
-      children: [],
-      lastAccessedAt: new Date().toISOString()
-    };
-    const next = [...state.projects, newProj];
-    dispatch({ type: 'UPDATE_PROJECTS', projects: next });
-    syncToCloud(next);
-    navigate(`/project/${newProj.id}/dashboard`);
-  };
 
   const activeView = (view || 'dashboard') as ViewType;
 
@@ -164,7 +131,7 @@ const ProjectView: React.FC = () => {
         selectedProjectId={currentProject.id} 
         isOpen={isSidebarOpen}
         onSelectProject={(id) => { navigate(`/project/${id}/${activeView}`); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
-        onAddProject={() => {}}
+        onAddProject={addNewProject}
       />
 
       <main className="flex-1 p-4 md:p-8 overflow-y-auto max-h-screen custom-scrollbar transition-all duration-300">
@@ -180,10 +147,6 @@ const ProjectView: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-3">
-            <button className="flex items-center gap-2 bg-white px-5 py-2.5 rounded-2xl font-bold text-sm shadow-md border border-pink-50 text-pink-400 hover:bg-pink-50 transition-all">
-              <Search size={18} className="text-pink-400" /> 搜尋
-            </button>
-
             {!state.user ? (
               <button onClick={() => signInWithPopup(auth!, googleProvider)} className="flex items-center gap-3 bg-white px-5 py-2.5 rounded-2xl font-bold text-sm shadow-md border border-blue-50 text-blue-500 hover:bg-blue-50 transition-all">
                 <LogIn size={18} /> Google 登入
@@ -195,11 +158,7 @@ const ProjectView: React.FC = () => {
               </div>
             )}
 
-            <button onClick={deleteCurrentProject} className="p-3 bg-white rounded-2xl shadow-md border border-pink-50 text-pink-300 hover:text-red-400 hover:border-red-100 transition-all">
-              <Trash2 size={20} />
-            </button>
-
-            <button onClick={addNewProject} className="flex items-center gap-2 bg-[#f04a94] text-white px-6 py-2.5 rounded-full font-bold text-sm shadow-lg hover:bg-pink-600 transition-all active:scale-95">
+            <button onClick={() => addNewProject(null)} className="flex items-center gap-2 bg-[#f04a94] text-white px-6 py-2.5 rounded-full font-bold text-sm shadow-lg hover:bg-pink-600 transition-all active:scale-95">
               <Plus size={18} /> 建立計畫
             </button>
           </div>
@@ -211,35 +170,15 @@ const ProjectView: React.FC = () => {
               <Filter size={14} />
               <span className="text-xs font-black">標籤篩選</span>
             </div>
-            
-            <button 
-              onClick={() => setActiveTagId(null)}
-              className={`px-5 py-1.5 rounded-full text-[12px] font-black border transition-all ${
-                !activeTagId ? 'bg-[#f04a94] text-white border-[#f04a94] shadow-md' : 'bg-white text-pink-300 border-pink-100 hover:bg-pink-50'
-              }`}
-            >
-              全部任務
-            </button>
-
-            {availableTags.map(tag => {
-              const isActive = activeTagId === tag.id;
-              return (
-                <button 
-                  key={tag.id}
-                  onClick={() => setActiveTagId(isActive ? null : tag.id)}
-                  className={`px-5 py-1.5 rounded-full text-[12px] font-black transition-all shadow-sm border ${
-                    isActive ? 'text-white shadow-pink-200' : 'bg-opacity-10'
-                  }`}
-                  style={{ 
-                    backgroundColor: isActive ? tag.color : `${tag.color}1A`,
-                    color: isActive ? '#fff' : tag.color,
-                    borderColor: isActive ? tag.color : `${tag.color}4D`
-                  }}
-                >
-                  {tag.text}
-                </button>
-              );
-            })}
+            <button onClick={() => setActiveTagId(null)} className={`px-5 py-1.5 rounded-full text-[12px] font-black border transition-all ${!activeTagId ? 'bg-[#f04a94] text-white border-[#f04a94] shadow-md' : 'bg-white text-pink-300 border-pink-100'}`}>全部任務</button>
+            {availableTags.map(tag => (
+              <button 
+                key={tag.id}
+                onClick={() => setActiveTagId(activeTagId === tag.id ? null : tag.id)}
+                className={`px-5 py-1.5 rounded-full text-[12px] font-black transition-all border ${activeTagId === tag.id ? 'text-white' : ''}`}
+                style={{ backgroundColor: activeTagId === tag.id ? tag.color : 'white', color: activeTagId === tag.id ? 'white' : tag.color, borderColor: tag.color }}
+              >{tag.text}</button>
+            ))}
           </div>
         )}
 
@@ -261,77 +200,33 @@ const ProjectView: React.FC = () => {
             <div className="space-y-12">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
                 <ProgressBoard tasks={filteredTasks} />
-                <ProjectPrecautions 
-                  precautions={currentProject.precautions || []} 
-                  backgroundColor={currentProject.precautionsColor}
-                  onUpdate={(items) => updateProject(currentProject.id, { precautions: items })} 
-                  onColorChange={(color) => updateProject(currentProject.id, { precautionsColor: color })}
-                />
+                <ProjectPrecautions precautions={currentProject.precautions || []} backgroundColor={currentProject.precautionsColor} onUpdate={(items) => updateProject(currentProject.id, { precautions: items })} onColorChange={(color) => updateProject(currentProject.id, { precautionsColor: color })} />
               </div>
               <GanttChart tasks={filteredTasks} />
               <div className="bg-white rounded-[40px] p-8 border border-pink-100 cute-shadow">
                 <div className="flex justify-between items-center mb-8">
                   <h3 className="text-xl font-bold text-pink-600 flex items-center gap-3">
-                    <span className="p-2 bg-pink-100 rounded-xl text-pink-500">
-                      <Check size={20} />
-                    </span>
+                    <span className="p-2 bg-pink-100 rounded-xl text-pink-500"><Check size={20} /></span>
                     任務清單
                   </h3>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {filteredTasks.map(task => (
                     <div key={task.id} onClick={() => setEditingTaskId(task.id)} className="flex items-center gap-4 p-5 rounded-[28px] bg-pink-50/20 border border-pink-50 hover:bg-white hover:shadow-lg transition-all cursor-pointer group">
-                       <div 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const newStatus = task.status === TaskStatus.COMPLETED ? TaskStatus.TODO : TaskStatus.COMPLETED;
-                            updateTask(task.id, { status: newStatus, progress: newStatus === TaskStatus.COMPLETED ? 100 : task.progress });
-                          }}
-                          className={`w-7 h-7 rounded-xl border-2 flex items-center justify-center transition-all ${task.status === TaskStatus.COMPLETED ? 'bg-pink-400 border-pink-400 text-white' : 'bg-white border-pink-100'}`}
-                        >
+                       <div className={`w-7 h-7 rounded-xl border-2 flex items-center justify-center transition-all ${task.status === TaskStatus.COMPLETED ? 'bg-pink-400 border-pink-400 text-white' : 'bg-white border-pink-100'}`}>
                          {task.status === TaskStatus.COMPLETED && <Check size={16} strokeWidth={4} />}
                        </div>
                        <div className="flex-1 min-w-0">
                          <p className={`font-black text-base text-[#5c4b51] ${task.status === TaskStatus.COMPLETED ? 'line-through opacity-40' : ''}`}>{task.title}</p>
-                         <div className="flex flex-wrap gap-1.5 mt-2">
-                           {task.tags?.map(tag => (
-                             <span key={tag.id} className="text-[10px] font-black px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: tag.color }}>{tag.text}</span>
-                           ))}
-                         </div>
                        </div>
-                       <div className="flex items-center gap-3">
-                         <div className="text-sm font-black text-pink-400">{task.progress}%</div>
-                         <button 
-                            onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }}
-                            className="p-2 opacity-0 group-hover:opacity-100 text-pink-200 hover:text-red-400 transition-all"
-                          >
-                           <Trash2 size={16} />
-                         </button>
-                       </div>
+                       <div className="text-sm font-black text-pink-400">{task.progress}%</div>
                     </div>
                   ))}
-                  <button 
-                    onClick={() => {
-                      const newTask: Task = {
-                        id: Math.random().toString(36).substr(2, 9),
-                        title: '新任務 🎀',
-                        description: '',
-                        startDate: new Date().toISOString(),
-                        endDate: addDays(new Date(), 3).toISOString(),
-                        progress: 0,
-                        status: TaskStatus.TODO,
-                        priority: TaskPriority.MEDIUM,
-                        color: '#ffb8d1',
-                        tags: [],
-                        attachments: []
-                      };
-                      updateProject(currentProject.id, { tasks: [...currentProject.tasks, newTask] });
-                      setEditingTaskId(newTask.id);
-                    }}
-                    className="flex items-center justify-center gap-2 p-5 rounded-[28px] border-2 border-dashed border-pink-100 text-pink-300 hover:border-pink-300 hover:text-pink-400 transition-all font-bold"
-                  >
-                    <Plus size={20} /> 新增計畫任務
-                  </button>
+                  <button onClick={() => {
+                    const nt: Task = { id: Math.random().toString(36).substr(2, 9), title: '新任務 🎀', description: '', startDate: new Date().toISOString(), endDate: addDays(new Date(), 3).toISOString(), progress: 0, status: TaskStatus.TODO, priority: TaskPriority.MEDIUM, color: '#ffb8d1', tags: [], attachments: [] };
+                    updateProject(currentProject.id, { tasks: [...currentProject.tasks, nt] });
+                    setEditingTaskId(nt.id);
+                  }} className="flex items-center justify-center gap-2 p-5 rounded-[28px] border-2 border-dashed border-pink-100 text-pink-300 hover:border-pink-300 hover:text-pink-400 transition-all font-bold"><Plus size={20} /> 新增任務</button>
                 </div>
               </div>
               <CalendarView tasks={filteredTasks} />
@@ -340,28 +235,27 @@ const ProjectView: React.FC = () => {
             <div className="animate-in fade-in duration-500">
               {activeView === 'gantt' && <GanttChart tasks={filteredTasks} />}
               {activeView === 'calendar' && <CalendarView tasks={filteredTasks} />}
-              {activeView === 'notes' && (
-                <NotesArea 
-                  notes={currentProject.notes} 
-                  logoUrl={currentProject.logoUrl} 
-                  attachments={currentProject.attachments}
-                  onUpdateNotes={(notes) => updateProject(currentProject.id, { notes })} 
-                  onUpdateLogo={(url) => updateProject(currentProject.id, { logoUrl: url })} 
-                  onUpdateAttachments={(files) => updateProject(currentProject.id, { attachments: files })}
-                />
-              )}
+              {activeView === 'notes' && <NotesArea notes={currentProject.notes} logoUrl={currentProject.logoUrl} attachments={currentProject.attachments} onUpdateNotes={(notes) => updateProject(currentProject.id, { notes })} onUpdateLogo={(url) => updateProject(currentProject.id, { logoUrl: url })} onUpdateAttachments={(files) => updateProject(currentProject.id, { attachments: files })} />}
             </div>
           )}
         </div>
       </main>
 
       {editingTaskId && filteredTasks.find(t => t.id === editingTaskId) && (
-        <TaskDetailModal 
-          task={filteredTasks.find(t => t.id === editingTaskId)!}
-          allProjects={state.projects}
-          onClose={() => setEditingTaskId(null)}
-          onUpdate={(up) => updateTask(editingTaskId, up)}
-        />
+        <TaskDetailModal task={filteredTasks.find(t => t.id === editingTaskId)!} allProjects={state.projects} onClose={() => setEditingTaskId(null)} onUpdate={(up) => {
+          const updateTaskInState = (list: Project[]): Project[] => list.map(p => {
+            const idx = p.tasks.findIndex(t => t.id === editingTaskId);
+            if (idx !== -1) {
+              const ts = [...p.tasks];
+              ts[idx] = { ...ts[idx], ...up };
+              return { ...p, tasks: ts };
+            }
+            return { ...p, children: updateTaskInState(p.children) };
+          });
+          const next = updateTaskInState(state.projects);
+          dispatch({ type: 'UPDATE_PROJECTS', projects: next });
+          syncToCloud(next);
+        }} />
       )}
     </div>
   );
