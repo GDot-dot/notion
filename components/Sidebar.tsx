@@ -36,7 +36,7 @@ const ProjectItem: React.FC<{
   return (
     <div className="flex flex-col">
       <div 
-        className={`flex items-center gap-2 p-2.5 rounded-xl cursor-pointer transition-all hover:bg-white/60 mb-1 ${isSelected ? 'bg-white shadow-md font-black translate-x-1 border-l-4 border-pink-400' : 'opacity-80'}`}
+        className={`flex items-center group relative gap-2 p-2.5 rounded-xl cursor-pointer transition-all hover:bg-white/60 mb-1 ${isSelected ? 'bg-white shadow-md font-black translate-x-1 border-l-4 border-pink-400' : 'opacity-80'}`}
         style={{ paddingLeft: `${level * 12 + 12}px` }}
         onClick={() => onSelectProject(project.id)}
       >
@@ -44,7 +44,15 @@ const ProjectItem: React.FC<{
           {project.children.length > 0 ? (isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : <div className="w-3.5" />}
         </div>
         <div className="flex-shrink-0 w-5 h-5 flex items-center justify-center">{renderLogo(project)}</div>
-        <span className="truncate text-sm text-[#5c4b51]">{project.name}</span>
+        <span className="truncate text-sm text-[#5c4b51] pr-6">{project.name}</span>
+        
+        {/* 建立子專案按鈕 */}
+        <button 
+          onClick={(e) => { e.stopPropagation(); onAddProject(project.id); }}
+          className="absolute right-2 opacity-0 group-hover:opacity-100 p-1 bg-pink-50 text-pink-400 rounded-lg hover:bg-pink-400 hover:text-white transition-all shadow-sm"
+        >
+          <Plus size={12} />
+        </button>
       </div>
       {isOpen && project.children.length > 0 && (
         <div className="flex flex-col">
@@ -57,7 +65,6 @@ const ProjectItem: React.FC<{
 
 export const Sidebar: React.FC<SidebarProps> = ({ projects, workspaceLogo, workspaceName, onUpdateWorkspace, selectedProjectId, isOpen, onSelectProject, onAddProject }) => {
   
-  // 🍓 計算最近存取的專案 (取前 3 個)
   const recentProjects = useMemo(() => {
     const all: Project[] = [];
     const flatten = (list: Project[]) => {
@@ -81,19 +88,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ projects, workspaceLogo, works
     <div className={`fixed inset-y-0 left-0 w-64 sanrio-pink h-screen flex flex-col p-6 border-r sanrio-border-pink z-50 transition-transform duration-300 shadow-xl md:relative md:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-2">
-          <div className="w-10 h-10 bg-white rounded-xl shadow-sm border border-pink-100 flex items-center justify-center relative overflow-hidden cursor-pointer group" onClick={() => { const res = prompt('自訂標誌 🍓', workspaceLogo); if (res) onUpdateWorkspace(res, workspaceName); }}>
+          <div className="w-10 h-10 bg-white rounded-xl shadow-sm border border-pink-100 flex items-center justify-center relative overflow-hidden cursor-pointer" onClick={() => { const res = prompt('自訂標誌 🍓', workspaceLogo); if (res) onUpdateWorkspace(res, workspaceName); }}>
             {workspaceLogo.startsWith('http') ? <img src={workspaceLogo} className="w-full h-full object-cover" /> : <span className="text-2xl">{workspaceLogo}</span>}
-            <div className="absolute inset-0 bg-pink-500/10 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"><Edit3 size={12} className="text-pink-500" /></div>
           </div>
-          <div className="flex flex-col cursor-pointer group relative" onClick={() => { const res = prompt('請輸入工作空間名稱 🍭', workspaceName); if (res) onUpdateWorkspace(workspaceLogo, res); }}>
-            <h1 className="font-black text-2xl text-pink-600 italic tracking-tighter transition-all group-hover:text-pink-400">{workspaceName}</h1>
-          </div>
+          <h1 className="font-black text-2xl text-pink-600 italic tracking-tighter">{workspaceName}</h1>
         </div>
         <button onClick={() => onAddProject(null)} className="p-2 bg-white/40 hover:bg-white rounded-xl transition-all shadow-sm border border-pink-100"><Plus size={18} className="text-pink-500" /></button>
       </div>
 
       <nav className="flex-1 space-y-6 overflow-y-auto no-scrollbar pr-1">
-        {/* 最近存取區塊 */}
         {recentProjects.length > 0 && (
           <div>
             <div className="text-[10px] font-black text-pink-400 uppercase tracking-[0.2em] mb-3 ml-3 opacity-60 flex items-center gap-2">

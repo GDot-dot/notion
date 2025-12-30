@@ -6,6 +6,16 @@ export const COLORS = {
   secondary: '#ffdeeb',
   accent: '#fff5f8',
   text: '#5c4b51',
+  tagThemes: [
+    '#ff85b2', // 經典粉
+    '#ffb347', // 暖心橘
+    '#fce38a', // 甜心黃
+    '#95e1d3', // 薄荷綠
+    '#a8e6cf', // 抹茶綠
+    '#dcedc1', // 嫩草綠
+    '#ffd3b6', // 蜜桃粉
+    '#ffaaa5', // 珊瑚紅
+  ],
   taskColors: [
     '#ffb8d1', // 粉
     '#b8e1ff', // 藍
@@ -51,7 +61,11 @@ export const INITIAL_PROJECTS: Project[] = [
         progress: 30,
         status: TaskStatus.IN_PROGRESS,
         priority: TaskPriority.MEDIUM,
-        color: '#ffb8d1'
+        color: '#ffb8d1',
+        tags: [
+          { id: 'tag-demo-1', text: '草莓蛋糕', color: '#ff85b2' },
+          { id: 'tag-demo-2', text: '緊急', color: '#ffaaa5' }
+        ]
       }
     ],
     children: [

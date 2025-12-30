@@ -21,6 +21,12 @@ export interface Attachment {
   createdAt: string;
 }
 
+export interface Tag {
+  id: string;
+  text: string;
+  color: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -33,6 +39,7 @@ export interface Task {
   color: string;
   relatedProjectId?: string;
   attachments?: Attachment[];
+  tags?: Tag[];
 }
 
 export interface Project {
