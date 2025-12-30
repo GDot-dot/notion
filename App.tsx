@@ -13,7 +13,7 @@ import { COLORS } from './constants.tsx';
 import { useProjects } from './context/ProjectContext.tsx';
 import { auth, googleProvider, isConfigured } from './lib/firebase.ts';
 import { signInWithPopup, signOut } from 'firebase/auth';
-import { Plus, LayoutDashboard, Calendar, BarChart2, BookOpen, Trash2, Check, Edit3, Menu, LogIn, ShieldAlert, Loader2, Save, CloudCheck, Search, X, FolderHeart, Sparkles } from 'lucide-react';
+import { Plus, LayoutDashboard, Calendar, BarChart2, BookOpen, Trash2, Check, Edit3, Menu, LogIn, ShieldAlert, Loader2, Save, CloudCheck, Search, X, FolderHeart, Sparkles, CloudOff } from 'lucide-react';
 import { addDays } from 'date-fns';
 
 // 🍓 搜尋面板組件
@@ -314,6 +314,23 @@ const ProjectView: React.FC = () => {
     navigate(`/project/${newP.id}/dashboard`);
   };
 
+  // 🍓 登入處理邏輯
+  const handleLogin = async () => {
+    if (!isConfigured) {
+      alert("🍭 需要先設定 Firebase 金鑰喔！\n\n請前往 lib/firebase.ts 檔案，將您的 Firebase 配置填入 firebaseConfig 物件中。");
+      return;
+    }
+    
+    if (!auth) return;
+
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error: any) {
+      console.error("Login failed:", error);
+      alert(`登入失敗 🥺\n原因：${error.message || "未知錯誤"}\n請檢查 Firebase 控制台的 Google Auth 是否已啟用。`);
+    }
+  };
+
   if (state.isLoading) return (
     <div className="h-screen flex items-center justify-center bg-[#fff5f8]">
       <Loader2 className="w-12 h-12 text-pink-400 animate-spin" />
@@ -339,13 +356,6 @@ const ProjectView: React.FC = () => {
       />
 
       <main className="flex-1 p-4 md:p-8 overflow-y-auto max-h-screen custom-scrollbar transition-all duration-300">
-        {!isConfigured && (
-          <div className="bg-orange-100 border-l-4 border-orange-500 text-orange-700 p-4 mb-6 rounded-r-xl flex items-center gap-3 animate-pulse">
-            <ShieldAlert className="flex-shrink-0" />
-            <p className="text-sm font-bold">⚠️ Firebase 尚未連線，資料暫存在本機 🍓</p>
-          </div>
-        )}
-
         <header className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-6">
           <div className="flex items-center gap-3 md:gap-6 group">
             <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 text-pink-500 bg-white rounded-xl shadow-sm border border-pink-100">
@@ -363,10 +373,16 @@ const ProjectView: React.FC = () => {
             <div className="flex-1 min-w-0">
               <input value={currentProject.name} onChange={(e) => updateProject(currentProject.id, { name: e.target.value })} className="text-2xl md:text-4xl font-black text-pink-600 bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-pink-100 rounded-xl px-2 w-full truncate" />
               <div className="flex items-center gap-2 mt-1 ml-2">
-                <div className="flex items-center gap-2 px-2 py-0.5 bg-white/40 rounded-full border border-pink-100">
-                  {state.isSyncing ? <><Loader2 size={12} className="text-pink-400 animate-spin" /><span className="text-[10px] text-pink-400 font-bold">同步中...</span></> : 
-                    state.user ? <><CloudCheck size={12} className="text-green-400" /><span className="text-[10px] text-green-500 font-bold">雲端已同步</span></> : 
-                    <><Save size={12} className="text-blue-400" /><span className="text-[10px] text-blue-500 font-bold">本地存檔</span></>}
+                <div className="flex items-center gap-2 px-3 py-1 bg-white/40 rounded-full border border-pink-100 shadow-sm">
+                  {state.isSyncing ? (
+                    <><Loader2 size={12} className="text-pink-400 animate-spin" /><span className="text-[10px] text-pink-400 font-bold">同步中...</span></>
+                  ) : !isConfigured ? (
+                    <><CloudOff size={12} className="text-pink-300" /><span className="text-[10px] text-pink-400 font-bold">🍓 本機模式 (未填寫金鑰)</span></>
+                  ) : state.user ? (
+                    <><CloudCheck size={12} className="text-green-400" /><span className="text-[10px] text-green-500 font-bold">雲端已同步</span></>
+                  ) : (
+                    <><Save size={12} className="text-blue-400" /><span className="text-[10px] text-blue-500 font-bold">等待登入</span></>
+                  )}
                 </div>
               </div>
             </div>
@@ -380,7 +396,10 @@ const ProjectView: React.FC = () => {
               <Search size={20} /> <span className="hidden sm:inline font-bold text-sm">搜尋</span>
             </button>
             {!state.user ? (
-              <button onClick={() => auth && signInWithPopup(auth, googleProvider)} className="flex items-center gap-2 bg-white text-blue-500 px-4 py-2 rounded-xl font-bold text-sm shadow-md border border-blue-50 hover:bg-blue-50 active:scale-95 transition-all">
+              <button 
+                onClick={handleLogin} 
+                className={`flex items-center gap-2 bg-white px-4 py-2 rounded-xl font-bold text-sm shadow-md border border-blue-50 transition-all text-blue-500 hover:bg-blue-50 active:scale-95`}
+              >
                 <LogIn size={18} /> Google 登入
               </button>
             ) : (
