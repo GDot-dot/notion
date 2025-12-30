@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Melody Project Manager</title>
+  <title>Melody Project Manager </title>
   
   <!-- 引入基礎 CSS -->
   
@@ -14,6 +14,7 @@
     body {
       font-family: 'Noto Sans TC', 'Kosugi Maru', sans-serif;
       background-color: #fff5f8;
+      color: #5c4b51;
       overflow-x: hidden;
     }
     .sanrio-pink { background-color: #ffdeeb; }
@@ -35,13 +36,35 @@
 
     #root { min-height: 100vh; }
 
-    /* Markdown 樣式微調 */
-    .prose h1 { font-size: 1.5rem; font-weight: 800; color: #ff85b2; margin-top: 1rem; margin-bottom: 0.5rem; }
-    .prose h2 { font-size: 1.25rem; font-weight: 700; color: #ff85b2; margin-top: 0.75rem; }
-    .prose p { margin-bottom: 0.5rem; line-height: 1.6; }
-    .prose ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 1rem; }
-    .prose strong { color: #ff6b9d; }
-    .prose code { background: #fee2e2; padding: 2px 4px; border-radius: 4px; font-size: 0.9em; }
+    /* 🍓 Markdown 深度美化與顏色修正 */
+    .prose { 
+      color: #5c4b51 !important; 
+      max-width: none;
+    }
+    .prose h1 { font-size: 1.8rem; font-weight: 900; color: #ff6b9d !important; border-bottom: 2px dashed #ffe2e2; padding-bottom: 0.5rem; margin-top: 1.5rem; }
+    .prose h2 { font-size: 1.4rem; font-weight: 800; color: #ff85b2 !important; margin-top: 1.2rem; }
+    .prose h3 { font-size: 1.1rem; font-weight: 700; color: #ff99c8 !important; }
+    .prose p { margin-bottom: 1rem; line-height: 1.8; color: #5c4b51 !important; }
+    .prose ul, .prose ol { padding-left: 1.5rem; margin-bottom: 1rem; color: #5c4b51 !important; }
+    .prose li { margin-bottom: 0.5rem; }
+    .prose strong { color: #ff5291 !important; font-weight: 800; }
+    .prose blockquote { border-left: 4px solid #ffb8d1; padding-left: 1rem; font-style: italic; color: #ff85b2 !important; background: #fff9fb; border-radius: 0 12px 12px 0; padding: 1rem; }
+    .prose code { background: #fee2e2 !important; color: #ff5291 !important; padding: 2px 6px; border-radius: 6px; font-size: 0.9em; font-weight: 600; }
+    
+    /* 表格樣式 */
+    .prose table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; border-radius: 16px; overflow: hidden; box-shadow: 0 0 0 1px #ffe2e2; }
+    .prose th { background-color: #fff0f5; color: #ff85b2; padding: 12px; font-weight: 800; text-align: left; }
+    .prose td { padding: 12px; border-top: 1px solid #ffe2e2; color: #5c4b51; }
+    .prose tr:nth-child(even) { background-color: #fffcfd; }
+
+    /* 任務列表 */
+    .prose input[type="checkbox"] {
+      width: 1.2rem;
+      height: 1.2rem;
+      accent-color: #ff85b2;
+      margin-right: 0.5rem;
+      vertical-align: middle;
+    }
   </style>
 
 <script type="importmap">
@@ -63,12 +86,11 @@
     "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js",
     "firebase/storage": "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js",
     "firebase/": "https://esm.sh/firebase@^12.7.0/",
-    "vite": "https://esm.sh/vite@^7.3.0",
-    "@google/genai": "https://esm.sh/@google/genai@^1.34.0"
+    "vite": "https://esm.sh/vite@^7.3.0"
   }
 }
 </script>
-  <script type="module" crossorigin src="./assets/index-DV4BzG0U.js"></script>
+  <script type="module" crossorigin src="./assets/index-BlJotfmy.js"></script>
   <link rel="stylesheet" crossorigin href="./assets/index-BDCp2UpY.css">
 </head>
 <body>
