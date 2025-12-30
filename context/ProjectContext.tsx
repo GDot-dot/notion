@@ -2,8 +2,9 @@
 import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
 import { Project } from '../types.ts';
 import { INITIAL_PROJECTS } from '../constants.tsx';
-import { auth, db } from '../lib/firebase.ts';
-import { onAuthStateChanged, User } from 'firebase/auth';
+// Fix: Import auth utilities from local firebase lib to resolve missing member errors
+import { auth, db, onAuthStateChanged } from '../lib/firebase.ts';
+import type { User } from '../lib/firebase.ts';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 
 interface State {

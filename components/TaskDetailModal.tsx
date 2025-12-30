@@ -22,7 +22,12 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, allProje
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !storage) return;
+    if (!file) return;
+
+    if (!storage) {
+      alert("🍭 請先設定 Firebase 金鑰才能使用上傳功能喔！");
+      return;
+    }
 
     setIsUploading(true);
     try {
@@ -41,11 +46,16 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, allProje
       };
 
       onUpdate({ attachments: [...(task.attachments || []), newAttachment] });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Upload failed:", error);
-      alert("檔案上傳失敗 🥺");
+      if (error.message.includes('CORS')) {
+        alert("🌐 上傳失敗：可能是 CORS 政策阻擋。\n\n請務必按照 lib/firebase.ts 中的指令設定 Storage 的 CORS 規則，網頁才能正常上傳檔案。");
+      } else {
+        alert(`檔案上傳失敗 🥺\n原因: ${error.message}`);
+      }
     } finally {
       setIsUploading(false);
+      e.target.value = '';
     }
   };
 
@@ -167,7 +177,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, allProje
             />
           </div>
 
-          {/* 檔案附件區域 */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-pink-300 flex items-center gap-1 uppercase tracking-wider">

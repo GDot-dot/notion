@@ -11,10 +11,11 @@ import { TaskDetailModal } from './components/TaskDetailModal.tsx';
 import { Project, ViewType, TaskStatus, Task, TaskPriority } from './types.ts';
 import { COLORS } from './constants.tsx';
 import { useProjects } from './context/ProjectContext.tsx';
-import { auth, googleProvider, isConfigured } from './lib/firebase.ts';
-import { signInWithPopup, signOut } from 'firebase/auth';
+// Fix: Use consolidated exports from local firebase lib
+import { auth, googleProvider, isConfigured, signInWithPopup, signOut } from './lib/firebase.ts';
 import { Plus, LayoutDashboard, Calendar, BarChart2, BookOpen, Trash2, Check, Edit3, Menu, LogIn, ShieldAlert, Loader2, Save, CloudCheck, Search, X, FolderHeart, Sparkles, CloudOff } from 'lucide-react';
 import { addDays } from 'date-fns';
+import { GoogleGenAI, Type } from "@google/genai";
 
 // 🍓 搜尋面板組件
 const SearchPalette: React.FC<{ 
@@ -259,6 +260,76 @@ const ProjectView: React.FC = () => {
     setEditingTaskId(newTask.id);
   };
 
+  // 🍓 Gemini AI 智慧建議功能
+  const generateAISuggestions = async () => {
+    if (!currentProject) return;
+    
+    // 進入同步狀態顯示 Loading
+    dispatch({ type: 'SET_SYNCING', isSyncing: true });
+    
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: `你是一位資深的專案管理導師。請根據專案名稱「${currentProject.name}」，提供 3 個相關且實用的具體待辦任務，以及 2 條對專案成功的關鍵小叮嚀。
+        請用繁體中文回答，並輸出為 JSON 格式。`,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              tasks: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    title: { type: Type.STRING },
+                    description: { type: Type.STRING }
+                  },
+                  required: ["title", "description"]
+                }
+              },
+              precautions: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING }
+              }
+            },
+            required: ["tasks", "precautions"]
+          }
+        }
+      });
+
+      const data = JSON.parse(response.text);
+      
+      const newTasks: Task[] = data.tasks.map((t: any) => ({
+        id: Math.random().toString(36).substr(2, 9),
+        title: t.title,
+        description: t.description,
+        startDate: new Date().toISOString(),
+        endDate: addDays(new Date(), 3).toISOString(),
+        progress: 0,
+        status: TaskStatus.TODO,
+        priority: TaskPriority.MEDIUM,
+        color: COLORS.taskColors[Math.floor(Math.random() * COLORS.taskColors.length)],
+        attachments: []
+      }));
+
+      const nextPrecautions = [...(currentProject.precautions || []), ...data.precautions];
+      const nextTasks = [...currentProject.tasks, ...newTasks];
+      
+      updateProject(currentProject.id, { 
+        tasks: nextTasks,
+        precautions: nextPrecautions
+      });
+      
+    } catch (error) {
+      console.error("AI Suggestions Error:", error);
+      alert("AI 靈感獲取失敗，請確認 API 金鑰是否有效 🥺");
+    } finally {
+      dispatch({ type: 'SET_SYNCING', isSyncing: false });
+    }
+  };
+
   const deleteTask = (taskId: string) => {
     if (!confirm('確定要刪除這個任務嗎？ 🍬')) return;
     const remover = (list: Project[]): Project[] => list.map(p => ({
@@ -375,7 +446,7 @@ const ProjectView: React.FC = () => {
               <div className="flex items-center gap-2 mt-1 ml-2">
                 <div className="flex items-center gap-2 px-3 py-1 bg-white/40 rounded-full border border-pink-100 shadow-sm">
                   {state.isSyncing ? (
-                    <><Loader2 size={12} className="text-pink-400 animate-spin" /><span className="text-[10px] text-pink-400 font-bold">同步中...</span></>
+                    <><Loader2 size={12} className="text-pink-400 animate-spin" /><span className="text-[10px] text-pink-400 font-bold">處理中...</span></>
                   ) : !isConfigured ? (
                     <><CloudOff size={12} className="text-pink-300" /><span className="text-[10px] text-pink-400 font-bold">🍓 本機模式 (未填寫金鑰)</span></>
                   ) : state.user ? (
@@ -389,6 +460,16 @@ const ProjectView: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-2 md:gap-4">
+            {/* 🍓 AI 智慧建議按鈕 */}
+            <button 
+              onClick={generateAISuggestions}
+              disabled={state.isSyncing}
+              className="p-2.5 bg-white text-pink-500 hover:text-pink-600 rounded-xl border border-pink-100 shadow-sm hover:bg-pink-50 transition-all flex items-center gap-2 group"
+            >
+              <Sparkles size={20} className={state.isSyncing ? "animate-pulse" : "group-hover:rotate-12 transition-transform"} /> 
+              <span className="hidden sm:inline font-bold text-sm">AI 靈感</span>
+            </button>
+
             <button 
               onClick={() => setIsSearchOpen(true)}
               className="p-2.5 bg-white text-pink-400 hover:text-pink-600 rounded-xl border border-pink-50 shadow-sm hover:bg-pink-50 transition-all flex items-center gap-2"

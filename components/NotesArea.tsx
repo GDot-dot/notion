@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Image as ImageIcon, Edit3, Eye, Info, Paperclip, Trash2, FileText, Download, Loader2 } from 'lucide-react';
+import { Image as ImageIcon, Edit3, Eye, Info, Paperclip, Trash2, FileText, Download, Loader2, AlertCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { storage } from '../lib/firebase.ts';
@@ -29,7 +29,12 @@ export const NotesArea: React.FC<NotesAreaProps> = ({
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !storage) return;
+    if (!file) return;
+
+    if (!storage) {
+      alert("🍭 請先設定 Firebase 金鑰才能使用上傳功能喔！");
+      return;
+    }
 
     setIsUploading(true);
     try {
@@ -48,11 +53,18 @@ export const NotesArea: React.FC<NotesAreaProps> = ({
       };
 
       onUpdateAttachments([...attachments, newAttachment]);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Upload failed:", error);
-      alert("檔案上傳失敗 🥺");
+      if (error.code === 'storage/unauthorized') {
+        alert("🔒 上傳失敗：權限不足。請檢查 Firebase Storage 的 Rules 是否已開放讀寫。");
+      } else if (error.message.includes('CORS') || error.name === 'FirebaseError') {
+        alert("🌐 上傳失敗：可能是 CORS 政策阻擋。\n\n請參考 lib/firebase.ts 中的註解，設定 Google Cloud Storage 的 CORS 規則。");
+      } else {
+        alert(`檔案上傳失敗 🥺\n原因: ${error.message}`);
+      }
     } finally {
       setIsUploading(false);
+      e.target.value = ''; // Reset input
     }
   };
 
@@ -65,7 +77,6 @@ export const NotesArea: React.FC<NotesAreaProps> = ({
       onUpdateAttachments(attachments.filter(a => a.id !== attachment.id));
     } catch (error) {
       console.error("Delete failed:", error);
-      // 即便 Storage 刪除失敗，也從 UI 移除，避免死結
       onUpdateAttachments(attachments.filter(a => a.id !== attachment.id));
     }
   };
@@ -81,7 +92,6 @@ export const NotesArea: React.FC<NotesAreaProps> = ({
   return (
     <div className="bg-white rounded-[40px] p-8 cute-shadow border border-pink-100 min-h-[600px] flex flex-col space-y-8">
       <div className="flex flex-col lg:flex-row gap-8">
-        {/* 左側：Logo 與 檔案管理 */}
         <div className="w-full lg:w-64 flex-shrink-0 space-y-8">
           <div>
             <label className="block text-sm font-bold text-pink-400 mb-4 uppercase tracking-wider">專案標誌 🎀</label>
@@ -110,6 +120,7 @@ export const NotesArea: React.FC<NotesAreaProps> = ({
                 onClick={() => document.getElementById('file-upload-notes')?.click()}
                 disabled={isUploading}
                 className="p-1.5 bg-pink-50 text-pink-400 rounded-lg hover:bg-pink-100 transition-colors disabled:opacity-50"
+                title="上傳附件"
               >
                 {isUploading ? <Loader2 size={16} className="animate-spin" /> : <Paperclip size={16} />}
               </button>
@@ -138,7 +149,6 @@ export const NotesArea: React.FC<NotesAreaProps> = ({
           </div>
         </div>
 
-        {/* 右側：筆記編輯與預覽 */}
         <div className="flex-1 flex flex-col min-w-0">
           <div className="flex items-center justify-between mb-4">
             <label className="text-sm font-bold text-pink-400 flex items-center gap-2 uppercase tracking-wider">
@@ -164,11 +174,7 @@ export const NotesArea: React.FC<NotesAreaProps> = ({
             {isEditing ? (
               <textarea
                 className="flex-1 w-full p-6 rounded-[32px] bg-pink-50/20 border-2 border-pink-50 focus:border-pink-200 focus:outline-none focus:ring-4 focus:ring-pink-50 text-[#5c4b51] resize-none font-mono text-sm leading-relaxed"
-                placeholder="# 標題 1
-## 標題 2
-- [ ] 任務
-- **粗體文字**
-支援完整 Markdown 語法！"
+                placeholder="# 標題 1\n## 標題 2\n- [ ] 任務\n- **粗體文字**\n支援完整 Markdown 語法！"
                 value={notes}
                 onChange={(e) => onUpdateNotes(e.target.value)}
               />
