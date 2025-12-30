@@ -1,7 +1,7 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
+import { HashRouter } from 'react-router-dom'; // 修改這裡
 import App from './App.tsx';
 import { ProjectProvider } from './context/ProjectContext.tsx';
 
@@ -13,10 +13,10 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <BrowserRouter>
+    <HashRouter> {/* 修改這裡 */}
       <ProjectProvider>
         <App />
       </ProjectProvider>
-    </BrowserRouter>
+    </HashRouter>
   </React.StrictMode>
 );
