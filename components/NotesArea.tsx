@@ -1,11 +1,9 @@
 
 import React, { useState } from 'react';
-import { Image as ImageIcon, Edit3, Eye, Info, Paperclip, Trash2, FileText, Download, Loader2, AlertCircle } from 'lucide-react';
+import { Edit3, Eye, Link, Trash2, FileText, ExternalLink, Plus, Image as ImageIcon, FileCode, Video, Globe } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { storage } from '../lib/firebase.ts';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { Attachment } from '../types.ts';
+import { Attachment, ResourceCategory } from '../types.ts';
 
 interface NotesAreaProps {
   notes: string;
@@ -25,125 +23,105 @@ export const NotesArea: React.FC<NotesAreaProps> = ({
   onUpdateAttachments
 }) => {
   const [isEditing, setIsEditing] = useState(true);
-  const [isUploading, setIsUploading] = useState(false);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!storage) {
-      alert("🍭 請先設定 Firebase 金鑰才能使用上傳功能喔！");
-      return;
-    }
-
-    setIsUploading(true);
-    try {
-      const storagePath = `notes/attachments/${Date.now()}_${file.name}`;
-      const storageRef = ref(storage, storagePath);
-      await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(storageRef);
-
-      const newAttachment: Attachment = {
-        id: Math.random().toString(36).substr(2, 9),
-        name: file.name,
-        url,
-        path: storagePath,
-        type: file.type,
-        createdAt: new Date().toISOString()
-      };
-
-      onUpdateAttachments([...attachments, newAttachment]);
-    } catch (error: any) {
-      console.error("Upload failed:", error);
-      if (error.code === 'storage/unauthorized') {
-        alert("🔒 上傳失敗：權限不足。請檢查 Firebase Storage 的 Rules 是否已開放讀寫。");
-      } else if (error.message.includes('CORS') || error.name === 'FirebaseError') {
-        alert("🌐 上傳失敗：可能是 CORS 政策阻擋。\n\n請參考 lib/firebase.ts 中的註解，設定 Google Cloud Storage 的 CORS 規則。");
-      } else {
-        alert(`檔案上傳失敗 🥺\n原因: ${error.message}`);
-      }
-    } finally {
-      setIsUploading(false);
-      e.target.value = ''; // Reset input
+  const getCategoryIcon = (category: ResourceCategory) => {
+    switch (category) {
+      case 'image': return <ImageIcon size={14} className="text-pink-400" />;
+      case 'design': return <FileCode size={14} className="text-purple-400" />;
+      case 'document': return <FileText size={14} className="text-blue-400" />;
+      case 'video': return <Video size={14} className="text-red-400" />;
+      default: return <Globe size={14} className="text-green-400" />;
     }
   };
 
-  const handleDeleteFile = async (attachment: Attachment) => {
-    if (!confirm('確定要刪除這個檔案嗎？ 🗑️') || !storage) return;
+  const handleAddResource = () => {
+    const name = prompt("🍓 資源名稱 (例如: 設計參考圖、需求文件)");
+    if (!name) return;
+    const url = prompt("🌐 貼上網址 (例如: Google Drive 或圖片連結)");
+    if (!url) return;
 
-    try {
-      const storageRef = ref(storage, attachment.path);
-      await deleteObject(storageRef);
-      onUpdateAttachments(attachments.filter(a => a.id !== attachment.id));
-    } catch (error) {
-      console.error("Delete failed:", error);
-      onUpdateAttachments(attachments.filter(a => a.id !== attachment.id));
-    }
-  };
+    // 自動偵測類型
+    let category: ResourceCategory = 'link';
+    if (url.match(/\.(jpeg|jpg|gif|png)$/) != null) category = 'image';
+    else if (url.includes('figma.com')) category = 'design';
+    else if (url.includes('docs.google.com') || url.includes('.pdf')) category = 'document';
+    else if (url.includes('youtube.com') || url.includes('vimeo.com')) category = 'video';
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const url = URL.createObjectURL(file);
-      onUpdateLogo(url);
-    }
+    const newAttachment: Attachment = {
+      id: Math.random().toString(36).substr(2, 9),
+      name,
+      url,
+      category,
+      createdAt: new Date().toISOString()
+    };
+    onUpdateAttachments([...attachments, newAttachment]);
   };
 
   return (
     <div className="bg-white rounded-[40px] p-8 cute-shadow border border-pink-100 min-h-[600px] flex flex-col space-y-8">
       <div className="flex flex-col lg:flex-row gap-8">
-        <div className="w-full lg:w-64 flex-shrink-0 space-y-8">
+        <div className="w-full lg:w-72 flex-shrink-0 space-y-8">
+          {/* Logo 區域 */}
           <div>
             <label className="block text-sm font-bold text-pink-400 mb-4 uppercase tracking-wider">專案標誌 🎀</label>
             <div 
               className="w-full aspect-square max-w-[200px] bg-pink-50 rounded-3xl border-2 border-dashed border-pink-200 flex items-center justify-center overflow-hidden relative group cursor-pointer shadow-inner mx-auto lg:mx-0"
-              onClick={() => document.getElementById('logo-input-notes')?.click()}
+              onClick={() => {
+                const res = prompt('輸入 Emoji (如 🍓) 或圖片網址', logoUrl || '📁');
+                if (res !== null) onUpdateLogo(res);
+              }}
             >
-              {logoUrl?.startsWith('http') || logoUrl?.startsWith('blob') ? (
+              {logoUrl?.startsWith('http') ? (
                 <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
-              ) : logoUrl ? (
-                <span className="text-6xl">{logoUrl}</span>
               ) : (
-                <ImageIcon className="text-pink-200" size={48} />
+                <span className="text-6xl">{logoUrl || '📁'}</span>
               )}
-              <div className="absolute inset-0 bg-pink-500/10 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                <span className="text-xs text-white font-bold bg-pink-400 px-3 py-1.5 rounded-full shadow-lg">更換標誌</span>
-              </div>
-              <input id="logo-input-notes" type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} />
             </div>
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <label className="text-sm font-bold text-pink-400 uppercase tracking-wider">相關檔案 📁</label>
+          {/* 強化版資源連結區 */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-bold text-pink-400 uppercase tracking-wider">資源管理庫 🍰</label>
               <button 
-                onClick={() => document.getElementById('file-upload-notes')?.click()}
-                disabled={isUploading}
-                className="p-1.5 bg-pink-50 text-pink-400 rounded-lg hover:bg-pink-100 transition-colors disabled:opacity-50"
-                title="上傳附件"
+                onClick={handleAddResource}
+                className="p-2 bg-pink-50 text-pink-500 rounded-xl hover:bg-pink-100 transition-all shadow-sm"
               >
-                {isUploading ? <Loader2 size={16} className="animate-spin" /> : <Paperclip size={16} />}
+                <Plus size={18} />
               </button>
-              <input id="file-upload-notes" type="file" className="hidden" onChange={handleFileUpload} />
             </div>
             
-            <div className="space-y-2">
-              {attachments.map(file => (
-                <div key={file.id} className="group flex items-center gap-2 p-2 bg-pink-50/30 rounded-xl border border-pink-50 hover:bg-white hover:shadow-sm transition-all">
-                  <FileText size={14} className="text-pink-300" />
-                  <span className="flex-1 text-[11px] font-bold text-[#5c4b51] truncate" title={file.name}>{file.name}</span>
-                  <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
-                    <a href={file.url} target="_blank" rel="noopener noreferrer" className="p-1 text-blue-300 hover:text-blue-500">
-                      <Download size={12} />
-                    </a>
-                    <button onClick={() => handleDeleteFile(file)} className="p-1 text-pink-200 hover:text-red-400">
-                      <Trash2 size={12} />
+            <div className="space-y-3">
+              {attachments.map(item => (
+                <div key={item.id} className="group flex flex-col p-3 bg-pink-50/20 border border-pink-50 rounded-2xl hover:bg-white hover:shadow-md transition-all">
+                  <div className="flex items-center gap-2 mb-2">
+                    {getCategoryIcon(item.category)}
+                    <span className="flex-1 text-[11px] font-bold text-[#5c4b51] truncate">{item.name}</span>
+                    <button onClick={() => onUpdateAttachments(attachments.filter(a => a.id !== item.id))} className="opacity-0 group-hover:opacity-100 p-1 text-pink-200 hover:text-red-400 transition-all">
+                      <Trash2 size={14} />
                     </button>
                   </div>
+                  
+                  {item.category === 'image' && (
+                    <div className="w-full h-24 rounded-lg bg-pink-100/30 overflow-hidden mb-2 border border-pink-50">
+                      <img src={item.url} className="w-full h-full object-cover opacity-80" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                    </div>
+                  )}
+
+                  <a 
+                    href={item.url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-1.5 py-1.5 bg-white border border-pink-100 rounded-xl text-[10px] font-black text-pink-400 hover:bg-pink-500 hover:text-white transition-all shadow-sm"
+                  >
+                    <ExternalLink size={10} /> 前往資源
+                  </a>
                 </div>
               ))}
               {attachments.length === 0 && (
-                <p className="text-center py-4 text-[10px] text-pink-200 font-bold italic">尚無檔案</p>
+                <div className="text-center py-10 px-4 bg-pink-50/10 rounded-3xl border-2 border-dashed border-pink-50">
+                   <p className="text-[10px] text-pink-200 font-bold italic leading-relaxed">貼上 Google Drive 或圖片連結<br/>實現 0 成本雲端管理 🍓</p>
+                </div>
               )}
             </div>
           </div>
@@ -152,37 +130,25 @@ export const NotesArea: React.FC<NotesAreaProps> = ({
         <div className="flex-1 flex flex-col min-w-0">
           <div className="flex items-center justify-between mb-4">
             <label className="text-sm font-bold text-pink-400 flex items-center gap-2 uppercase tracking-wider">
-              <Edit3 size={16} /> Markdown 筆記區域 🍓
+              <Edit3 size={16} /> 專案內容筆記 🍓
             </label>
             <div className="flex bg-pink-50 p-1 rounded-xl border border-pink-100">
-              <button 
-                onClick={() => setIsEditing(true)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${isEditing ? 'bg-white text-pink-500 shadow-sm' : 'text-pink-300'}`}
-              >
-                <Edit3 size={12} /> 編輯
-              </button>
-              <button 
-                onClick={() => setIsEditing(false)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${!isEditing ? 'bg-white text-pink-500 shadow-sm' : 'text-pink-300'}`}
-              >
-                <Eye size={12} /> 預覽
-              </button>
+              <button onClick={() => setIsEditing(true)} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${isEditing ? 'bg-white text-pink-500 shadow-sm' : 'text-pink-300'}`}>編輯</button>
+              <button onClick={() => setIsEditing(false)} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${!isEditing ? 'bg-white text-pink-500 shadow-sm' : 'text-pink-300'}`}>預覽</button>
             </div>
           </div>
 
           <div className="flex-1 flex flex-col min-h-[400px]">
             {isEditing ? (
               <textarea
-                className="flex-1 w-full p-6 rounded-[32px] bg-pink-50/20 border-2 border-pink-50 focus:border-pink-200 focus:outline-none focus:ring-4 focus:ring-pink-50 text-[#5c4b51] resize-none font-mono text-sm leading-relaxed"
-                placeholder="# 標題 1\n## 標題 2\n- [ ] 任務\n- **粗體文字**\n支援完整 Markdown 語法！"
+                className="flex-1 w-full p-8 rounded-[40px] bg-pink-50/20 border-2 border-pink-50 focus:border-pink-200 focus:outline-none focus:ring-4 focus:ring-pink-50 text-[#5c4b51] resize-none font-mono text-sm"
                 value={notes}
                 onChange={(e) => onUpdateNotes(e.target.value)}
+                placeholder="在這裡留下專案筆記..."
               />
             ) : (
-              <div className="flex-1 w-full p-8 rounded-[32px] bg-white border border-pink-50 overflow-y-auto prose prose-pink max-w-none shadow-inner">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {notes || "*這是一張空白的畫布，快來留下你的想法吧！*"}
-                </ReactMarkdown>
+              <div className="flex-1 w-full p-8 rounded-[40px] bg-white border border-pink-50 overflow-y-auto prose prose-pink max-w-none shadow-inner">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{notes || "*還沒有內容喔...*"}</ReactMarkdown>
               </div>
             )}
           </div>

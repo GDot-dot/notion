@@ -11,12 +11,13 @@ export enum TaskPriority {
   HIGH = '高'
 }
 
+export type ResourceCategory = 'document' | 'image' | 'design' | 'link' | 'video';
+
 export interface Attachment {
   id: string;
   name: string;
   url: string;
-  path: string; // Firebase Storage 的路徑，用於刪除
-  type: string;
+  category: ResourceCategory;
   createdAt: string;
 }
 
