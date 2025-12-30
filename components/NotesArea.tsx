@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { Edit3, Eye, Trash2, FileText, ExternalLink, Plus, Image as ImageIcon, FileCode, Video, Globe, X, Save } from 'lucide-react';
+import React, { useState } from 'react';
+import { Edit3, Eye, Trash2, FileText, ExternalLink, Plus, Image as ImageIcon, FileCode, Video, Globe, Link as LinkIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Attachment, ResourceCategory } from '../types.ts';
@@ -22,32 +22,7 @@ export const NotesArea: React.FC<NotesAreaProps> = ({
   onUpdateLogo,
   onUpdateAttachments
 }) => {
-  // 🍓 預設為預覽模式 (isEditing = false)
-  const [isEditing, setIsEditing] = useState(false);
-  const [showPreviewDuringEdit, setShowPreviewDuringEdit] = useState(false);
-  const [tempNotes, setTempNotes] = useState(notes);
-
-  // 當切換專案時，同步內部的暫存筆記
-  useEffect(() => {
-    setTempNotes(notes);
-    setIsEditing(false); // 切換專案時回到預覽模式
-  }, [notes]);
-
-  const handleStartEdit = () => {
-    setTempNotes(notes);
-    setIsEditing(true);
-    setShowPreviewDuringEdit(false);
-  };
-
-  const handleSave = () => {
-    onUpdateNotes(tempNotes);
-    setIsEditing(false);
-  };
-
-  const handleCancel = () => {
-    setTempNotes(notes);
-    setIsEditing(false);
-  };
+  const [isEditing, setIsEditing] = useState(true);
 
   const getCategoryIcon = (category: ResourceCategory) => {
     switch (category) {
@@ -83,7 +58,7 @@ export const NotesArea: React.FC<NotesAreaProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-[40px] p-8 cute-shadow border border-pink-100 min-h-[600px] flex flex-col space-y-8 animate-in fade-in duration-500">
+    <div className="bg-white rounded-[40px] p-8 cute-shadow border border-pink-100 min-h-[600px] flex flex-col space-y-8">
       <div className="flex flex-col lg:flex-row gap-8">
         <div className="w-full lg:w-72 flex-shrink-0 space-y-8">
           {/* Logo 區域 */}
@@ -146,69 +121,37 @@ export const NotesArea: React.FC<NotesAreaProps> = ({
                   </a>
                 </div>
               ))}
+              {attachments.length === 0 && (
+                <div className="text-center py-10 px-4 bg-pink-50/10 rounded-3xl border-2 border-dashed border-pink-50">
+                   <p className="text-[10px] text-pink-200 font-bold italic leading-relaxed">貼上雲端連結<br/>即可取代檔案上傳 🍓</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
         <div className="flex-1 flex flex-col min-w-0">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-4">
             <label className="text-sm font-bold text-pink-400 flex items-center gap-2 uppercase tracking-wider">
-              <FileText size={18} /> 專案內容筆記 🍓
+              <Edit3 size={16} /> 專案內容筆記 🍓
             </label>
-            
-            <div className="flex items-center gap-2">
-              {!isEditing ? (
-                // 🍓 預設模式：僅顯示編輯按鈕
-                <button 
-                  onClick={handleStartEdit}
-                  className="flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-pink-500 text-white text-xs font-bold hover:bg-pink-600 shadow-md transition-all active:scale-95"
-                >
-                  <Edit3 size={14} /> 編輯筆記
-                </button>
-              ) : (
-                // 🍓 編輯模式：顯示 取消、預覽/編輯、完成
-                <div className="flex items-center gap-2 bg-pink-50 p-1.5 rounded-[20px] border border-pink-100">
-                  <button 
-                    onClick={handleCancel}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-pink-400 hover:text-red-500 hover:bg-white transition-all"
-                  >
-                    <X size={14} /> 取消編輯
-                  </button>
-                  <div className="w-[1px] h-4 bg-pink-100 mx-1" />
-                  <button 
-                    onClick={() => setShowPreviewDuringEdit(!showPreviewDuringEdit)} 
-                    className={`flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold transition-all ${showPreviewDuringEdit ? 'bg-white text-pink-500 shadow-sm' : 'text-pink-300 hover:text-pink-500'}`}
-                  >
-                    {showPreviewDuringEdit ? <Edit3 size={14} /> : <Eye size={14} />} 
-                    {showPreviewDuringEdit ? '切換編輯' : '預覽'}
-                  </button>
-                  <button 
-                    onClick={handleSave}
-                    className="flex items-center gap-2 px-5 py-2 rounded-xl bg-pink-500 text-white text-xs font-bold hover:bg-pink-600 shadow-lg transition-all active:scale-95"
-                  >
-                    <Save size={14} /> 編輯完成
-                  </button>
-                </div>
-              )}
+            <div className="flex bg-pink-50 p-1 rounded-xl border border-pink-100">
+              <button onClick={() => setIsEditing(true)} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${isEditing ? 'bg-white text-pink-500 shadow-sm' : 'text-pink-300'}`}>編輯</button>
+              <button onClick={() => setIsEditing(false)} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${!isEditing ? 'bg-white text-pink-500 shadow-sm' : 'text-pink-300'}`}>預覽</button>
             </div>
           </div>
 
-          <div className="flex-1 flex flex-col min-h-[550px]">
-            {isEditing && !showPreviewDuringEdit ? (
+          <div className="flex-1 flex flex-col min-h-[400px]">
+            {isEditing ? (
               <textarea
-                className="flex-1 w-full p-8 rounded-[40px] bg-pink-50/10 border-2 border-pink-50 focus:border-pink-200 focus:outline-none focus:ring-4 focus:ring-pink-50/30 text-[#5c4b51] resize-none font-mono text-base leading-relaxed"
-                value={tempNotes}
-                onChange={(e) => setTempNotes(e.target.value)}
+                className="flex-1 w-full p-8 rounded-[40px] bg-pink-50/20 border-2 border-pink-50 focus:border-pink-200 focus:outline-none focus:ring-4 focus:ring-pink-50 text-[#5c4b51] resize-none font-mono text-sm leading-relaxed"
+                value={notes}
+                onChange={(e) => onUpdateNotes(e.target.value)}
                 placeholder="在這裡留下專案筆記，支援 Markdown 語法..."
-                autoFocus
               />
             ) : (
-              <div className="flex-1 w-full p-8 rounded-[40px] bg-white border border-pink-50 overflow-y-auto shadow-inner animate-in fade-in duration-300">
-                <div className="prose prose-pink">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {(isEditing ? tempNotes : notes) || "*目前這張畫布還是空的，點擊右上方編輯按鈕開始創作吧！🍓*"}
-                  </ReactMarkdown>
-                </div>
+              <div className="flex-1 w-full p-8 rounded-[40px] bg-white border border-pink-50 overflow-y-auto prose prose-pink max-w-none shadow-inner">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{notes || "*目前這張畫布還是空的...*"}</ReactMarkdown>
               </div>
             )}
           </div>

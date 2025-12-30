@@ -32,47 +32,20 @@ export const COLORS = {
   }
 };
 
-const MARKDOWN_EXAMPLE = `# 🍓 歡迎來到您的 Melody 空間！
-
-這是一個強大的筆記區域，支援完整的 **Markdown** 語法。您可以嘗試以下功能：
-
-### 🎀 基礎樣式
-- **粗體文字** 與 *斜體文字*
-- ~~刪除線效果~~
-- [外部連結 (例如 Google)](https://google.com)
-
-### 🍭 任務清單
-- [x] 完成專案初始設定
-- [ ] 邀請團隊成員
-- [ ] 買一塊草莓蛋糕犒賞自己
-
-### 🍰 資訊表格
-| 項目 | 進度 | 負責人 |
-| :--- | :---: | :--- |
-| UI 設計 | 100% | Melody |
-| API 串接 | 40% | Kero |
-| 測試發佈 | 0% | Kuromi |
-
-### 🖼️ 圖片嵌入
-![Melody](https://images.unsplash.com/photo-1516627145497-ae6968895b74?auto=format&fit=crop&q=80&w=200)
-
-> **小叮嚀**：點擊右上方「編輯」按鈕即可開始修改這份筆記喔！✨
-`;
-
 export const INITIAL_PROJECTS: Project[] = [
   {
     id: 'root-1',
     name: '我的夢想計畫 🎀',
     parentId: null,
-    notes: MARKDOWN_EXAMPLE,
-    logoUrl: '🍓', 
+    notes: '這是我的第一個專案筆記！點擊左上角圖示可以換成 Emoji。',
+    logoUrl: '📁', 
     precautions: ['記得要在圖表上放可愛的 Logo 喔！✨', '使用粉嫩色系（粉紅、粉藍、粉黃）。'],
     precautionsColor: '#fff9c4',
     tasks: [
       {
         id: 'task-1',
         title: '歡迎使用 Melody 管理工具',
-        description: '這是一個示範任務，您可以點擊它查看詳細內容。',
+        description: '這是一個示範任務。',
         startDate: new Date().toISOString(),
         endDate: new Date(Date.now() + 86400000 * 3).toISOString(),
         progress: 30,
@@ -86,7 +59,7 @@ export const INITIAL_PROJECTS: Project[] = [
         id: 'child-1',
         name: '子專案範例 ✨',
         parentId: 'root-1',
-        notes: '這是子專案的筆記空間。',
+        notes: '子專案的詳細說明。',
         logoUrl: '📁',
         precautions: [],
         precautionsColor: '#ffecf2',
