@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Edit3, Eye, Link, Trash2, FileText, ExternalLink, Plus, Image as ImageIcon, FileCode, Video, Globe } from 'lucide-react';
+import { Edit3, Eye, Trash2, FileText, ExternalLink, Plus, Image as ImageIcon, FileCode, Video, Globe, Link as LinkIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Attachment, ResourceCategory } from '../types.ts';
@@ -40,12 +40,12 @@ export const NotesArea: React.FC<NotesAreaProps> = ({
     const url = prompt("🌐 貼上網址 (例如: Google Drive 或圖片連結)");
     if (!url) return;
 
-    // 自動偵測類型
     let category: ResourceCategory = 'link';
-    if (url.match(/\.(jpeg|jpg|gif|png)$/) != null) category = 'image';
-    else if (url.includes('figma.com')) category = 'design';
-    else if (url.includes('docs.google.com') || url.includes('.pdf')) category = 'document';
-    else if (url.includes('youtube.com') || url.includes('vimeo.com')) category = 'video';
+    const lowUrl = url.toLowerCase();
+    if (lowUrl.match(/\.(jpeg|jpg|gif|png|webp)$/) != null) category = 'image';
+    else if (lowUrl.includes('figma.com')) category = 'design';
+    else if (lowUrl.includes('docs.google.com') || lowUrl.includes('.pdf') || lowUrl.includes('.docx')) category = 'document';
+    else if (lowUrl.includes('youtube.com') || lowUrl.includes('vimeo.com') || lowUrl.includes('bilibili.com')) category = 'video';
 
     const newAttachment: Attachment = {
       id: Math.random().toString(36).substr(2, 9),
@@ -76,13 +76,16 @@ export const NotesArea: React.FC<NotesAreaProps> = ({
               ) : (
                 <span className="text-6xl">{logoUrl || '📁'}</span>
               )}
+              <div className="absolute inset-0 bg-pink-500/10 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                <span className="text-[10px] font-bold bg-white/90 text-pink-500 px-3 py-1 rounded-full shadow-sm">更換圖標</span>
+              </div>
             </div>
           </div>
 
-          {/* 強化版資源連結區 */}
+          {/* 資源庫區域 */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <label className="text-sm font-bold text-pink-400 uppercase tracking-wider">資源管理庫 🍰</label>
+              <label className="text-sm font-bold text-pink-400 uppercase tracking-wider">資源連結庫 🍭</label>
               <button 
                 onClick={handleAddResource}
                 className="p-2 bg-pink-50 text-pink-500 rounded-xl hover:bg-pink-100 transition-all shadow-sm"
@@ -96,15 +99,15 @@ export const NotesArea: React.FC<NotesAreaProps> = ({
                 <div key={item.id} className="group flex flex-col p-3 bg-pink-50/20 border border-pink-50 rounded-2xl hover:bg-white hover:shadow-md transition-all">
                   <div className="flex items-center gap-2 mb-2">
                     {getCategoryIcon(item.category)}
-                    <span className="flex-1 text-[11px] font-bold text-[#5c4b51] truncate">{item.name}</span>
-                    <button onClick={() => onUpdateAttachments(attachments.filter(a => a.id !== item.id))} className="opacity-0 group-hover:opacity-100 p-1 text-pink-200 hover:text-red-400 transition-all">
+                    <span className="flex-1 text-[11px] font-bold text-[#5c4b51] truncate" title={item.name}>{item.name}</span>
+                    <button onClick={() => onUpdateAttachments(attachments.filter(a => a.id !== item.id))} className="opacity-0 group-hover:opacity-100 p-1 text-pink-200 hover:text-red-400">
                       <Trash2 size={14} />
                     </button>
                   </div>
                   
                   {item.category === 'image' && (
-                    <div className="w-full h-24 rounded-lg bg-pink-100/30 overflow-hidden mb-2 border border-pink-50">
-                      <img src={item.url} className="w-full h-full object-cover opacity-80" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                    <div className="w-full h-24 rounded-lg bg-pink-100/30 overflow-hidden mb-2 border border-pink-50 relative group/img">
+                      <img src={item.url} className="w-full h-full object-cover" onError={(e) => (e.currentTarget.parentElement!.style.display = 'none')} />
                     </div>
                   )}
 
@@ -114,13 +117,13 @@ export const NotesArea: React.FC<NotesAreaProps> = ({
                     rel="noopener noreferrer"
                     className="flex items-center justify-center gap-1.5 py-1.5 bg-white border border-pink-100 rounded-xl text-[10px] font-black text-pink-400 hover:bg-pink-500 hover:text-white transition-all shadow-sm"
                   >
-                    <ExternalLink size={10} /> 前往資源
+                    <ExternalLink size={10} /> 打開資源
                   </a>
                 </div>
               ))}
               {attachments.length === 0 && (
                 <div className="text-center py-10 px-4 bg-pink-50/10 rounded-3xl border-2 border-dashed border-pink-50">
-                   <p className="text-[10px] text-pink-200 font-bold italic leading-relaxed">貼上 Google Drive 或圖片連結<br/>實現 0 成本雲端管理 🍓</p>
+                   <p className="text-[10px] text-pink-200 font-bold italic leading-relaxed">貼上雲端連結<br/>即可取代檔案上傳 🍓</p>
                 </div>
               )}
             </div>
@@ -141,14 +144,14 @@ export const NotesArea: React.FC<NotesAreaProps> = ({
           <div className="flex-1 flex flex-col min-h-[400px]">
             {isEditing ? (
               <textarea
-                className="flex-1 w-full p-8 rounded-[40px] bg-pink-50/20 border-2 border-pink-50 focus:border-pink-200 focus:outline-none focus:ring-4 focus:ring-pink-50 text-[#5c4b51] resize-none font-mono text-sm"
+                className="flex-1 w-full p-8 rounded-[40px] bg-pink-50/20 border-2 border-pink-50 focus:border-pink-200 focus:outline-none focus:ring-4 focus:ring-pink-50 text-[#5c4b51] resize-none font-mono text-sm leading-relaxed"
                 value={notes}
                 onChange={(e) => onUpdateNotes(e.target.value)}
-                placeholder="在這裡留下專案筆記..."
+                placeholder="在這裡留下專案筆記，支援 Markdown 語法..."
               />
             ) : (
               <div className="flex-1 w-full p-8 rounded-[40px] bg-white border border-pink-50 overflow-y-auto prose prose-pink max-w-none shadow-inner">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{notes || "*還沒有內容喔...*"}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{notes || "*目前這張畫布還是空的...*"}</ReactMarkdown>
               </div>
             )}
           </div>
