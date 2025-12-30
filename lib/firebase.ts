@@ -1,10 +1,13 @@
 
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
+import type { User } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
-
+/**
+ * 🍓 請填入您的 Firebase 配置 🍓
+ */
 export const firebaseConfig = {
   apiKey: "AIzaSyApdW3VyiDJc9kJhvl6KC2IB4Q7HX6jBGM",
   authDomain: "notion-35f2a.firebaseapp.com",
@@ -15,9 +18,14 @@ export const firebaseConfig = {
   measurementId: "G-4D3LMLMZ0Q"
 };
 
+
 export const isConfigured = firebaseConfig.apiKey !== "YOUR_API_KEY" && firebaseConfig.apiKey !== "";
 export const app = isConfigured ? initializeApp(firebaseConfig) : null;
 export const auth = app ? getAuth(app) : null;
 export const db = app ? getFirestore(app) : null;
 export const storage = app ? getStorage(app) : null;
 export const googleProvider = new GoogleAuthProvider();
+
+// Export auth utilities to fix import errors in other components
+export { signInWithPopup, signOut, onAuthStateChanged };
+export type { User };
