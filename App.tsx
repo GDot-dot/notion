@@ -39,7 +39,6 @@ const TaskItem = React.memo(({ task, onToggleStatus, onEdit, onDelete }: {
       <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
         <div className="px-3 py-1 rounded-full text-[10px] font-black border border-white/50 shadow-sm" style={{ backgroundColor: COLORS.status[task.status] }}>{task.status}</div>
         <span className="text-sm font-bold text-pink-500 min-w-[32px]">{task.progress}%</span>
-        {/* 🍭 需求確認：刪除任務功能 */}
         <button 
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
           className="p-2 text-pink-200 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-50 rounded-xl"
@@ -74,7 +73,7 @@ const ProjectView: React.FC = () => {
 
   const activeView = (view || 'dashboard') as ViewType;
 
-  // 輔助函式：遞迴獲取所有子專案的任務（用於甘特圖與進度表）
+  // 輔助函式：遞迴獲取所有子專案的任務
   const getAggregatedTasks = useCallback((proj: Project): Task[] => {
     let tasks = [...proj.tasks];
     proj.children.forEach(child => {
@@ -87,7 +86,7 @@ const ProjectView: React.FC = () => {
     return currentProject ? getAggregatedTasks(currentProject) : [];
   }, [currentProject, getAggregatedTasks]);
 
-  // 更新專案資訊（遞迴遍歷整個 projects 陣列）
+  // 更新專案資訊
   const updateProject = (id: string, updates: Partial<Project>) => {
     const updater = (list: Project[]): Project[] => list.map(p => {
       if (p.id === id) return { ...p, ...updates };
@@ -98,7 +97,7 @@ const ProjectView: React.FC = () => {
     syncToCloud(next);
   };
 
-  // 更新任務資訊（遞迴遍歷整個專案樹）
+  // 更新任務資訊
   const updateTask = (taskId: string, updates: Partial<Task>) => {
     const updater = (list: Project[]): Project[] => list.map(p => {
       const idx = p.tasks.findIndex(t => t.id === taskId);
@@ -168,6 +167,7 @@ const ProjectView: React.FC = () => {
       parentId,
       notes: '',
       precautions: [],
+      precautionsColor: COLORS.stickyNotes[Math.floor(Math.random() * COLORS.stickyNotes.length)],
       tasks: [],
       children: [],
       logoUrl: '📁'
@@ -278,7 +278,12 @@ const ProjectView: React.FC = () => {
             <div className="space-y-8 md:space-y-12">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
                 <ProgressBoard tasks={aggregatedTasks} />
-                <ProjectPrecautions precautions={currentProject.precautions || []} onUpdate={(items) => updateProject(currentProject.id, { precautions: items })} />
+                <ProjectPrecautions 
+                  precautions={currentProject.precautions || []} 
+                  backgroundColor={currentProject.precautionsColor}
+                  onUpdate={(items) => updateProject(currentProject.id, { precautions: items })} 
+                  onColorChange={(color) => updateProject(currentProject.id, { precautionsColor: color })}
+                />
               </div>
               <GanttChart tasks={aggregatedTasks} />
               <div className="bg-white rounded-[32px] md:rounded-[40px] p-6 md:p-8 cute-shadow border border-pink-100">

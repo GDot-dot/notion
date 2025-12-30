@@ -30,6 +30,7 @@ export interface Project {
   logoUrl?: string;
   notes: string;
   precautions: string[]; // 專案注意事項小叮嚀
+  precautionsColor?: string; // 注意事項區域的背景顏色
   tasks: Task[];
   children: Project[];
   parentId: string | null;
