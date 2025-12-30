@@ -1,11 +1,13 @@
 
 import React, { useState } from 'react';
-import { X, Calendar, Flag, AlignLeft, CheckCircle2, Eye, Edit3 } from 'lucide-react';
-import { Task, TaskPriority, TaskStatus, Project } from '../types.ts';
+import { X, Calendar, Flag, AlignLeft, CheckCircle2, Eye, Edit3, Paperclip, Loader2, FileText, Download, Trash2 } from 'lucide-react';
+import { Task, TaskPriority, TaskStatus, Project, Attachment } from '../types.ts';
 import { COLORS } from '../constants.tsx';
 import { format } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { storage } from '../lib/firebase.ts';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 interface TaskDetailModalProps {
   task: Task;
@@ -16,6 +18,49 @@ interface TaskDetailModalProps {
 
 export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, allProjects, onClose, onUpdate }) => {
   const [isPreview, setIsPreview] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !storage) return;
+
+    setIsUploading(true);
+    try {
+      const storagePath = `tasks/${task.id}/${Date.now()}_${file.name}`;
+      const storageRef = ref(storage, storagePath);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+
+      const newAttachment: Attachment = {
+        id: Math.random().toString(36).substr(2, 9),
+        name: file.name,
+        url,
+        path: storagePath,
+        type: file.type,
+        createdAt: new Date().toISOString()
+      };
+
+      onUpdate({ attachments: [...(task.attachments || []), newAttachment] });
+    } catch (error) {
+      console.error("Upload failed:", error);
+      alert("檔案上傳失敗 🥺");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDeleteFile = async (attachment: Attachment) => {
+    if (!confirm('確定要刪除這個附件嗎？ 🗑️') || !storage) return;
+
+    try {
+      const storageRef = ref(storage, attachment.path);
+      await deleteObject(storageRef);
+      onUpdate({ attachments: (task.attachments || []).filter(a => a.id !== attachment.id) });
+    } catch (error) {
+      console.error("Delete failed:", error);
+      onUpdate({ attachments: (task.attachments || []).filter(a => a.id !== attachment.id) });
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[60] flex justify-end bg-black/20 backdrop-blur-sm animate-in fade-in duration-300">
@@ -122,6 +167,42 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, allProje
             />
           </div>
 
+          {/* 檔案附件區域 */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-pink-300 flex items-center gap-1 uppercase tracking-wider">
+                <Paperclip size={12} /> 任務附件
+              </label>
+              <button 
+                onClick={() => document.getElementById('task-file-upload')?.click()}
+                disabled={isUploading}
+                className="text-[10px] font-bold px-2 py-1 rounded-lg bg-pink-50 text-pink-400 hover:bg-pink-100 transition-colors flex items-center gap-1"
+              >
+                {isUploading ? <Loader2 size={10} className="animate-spin" /> : <><Paperclip size={10} /> 上傳檔案</>}
+              </button>
+              <input id="task-file-upload" type="file" className="hidden" onChange={handleFileUpload} />
+            </div>
+            <div className="grid grid-cols-1 gap-2">
+              {task.attachments?.map(file => (
+                <div key={file.id} className="flex items-center gap-3 p-3 bg-pink-50/20 border border-pink-50 rounded-2xl group">
+                  <FileText size={16} className="text-pink-300" />
+                  <span className="flex-1 text-xs font-bold text-[#5c4b51] truncate">{file.name}</span>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <a href={file.url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-blue-400 hover:bg-blue-50 rounded-lg">
+                      <Download size={14} />
+                    </a>
+                    <button onClick={() => handleDeleteFile(file)} className="p-1.5 text-pink-300 hover:text-red-400 hover:bg-red-50 rounded-lg">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {(!task.attachments || task.attachments.length === 0) && (
+                <p className="text-center py-4 text-[10px] text-pink-200 font-bold italic">尚無附件</p>
+              )}
+            </div>
+          </div>
+
           <div className="space-y-2 flex-1 flex flex-col">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-pink-300 flex items-center gap-1 uppercase tracking-wider">
@@ -135,7 +216,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, allProje
               </button>
             </div>
             {isPreview ? (
-              <div className="w-full flex-1 p-6 rounded-[30px] bg-pink-50/10 border border-pink-50 prose max-w-none overflow-y-auto min-h-[180px]">
+              <div className="w-full flex-1 p-6 rounded-[30px] bg-pink-50/10 border border-pink-50 prose prose-pink max-w-none overflow-y-auto min-h-[180px] shadow-inner">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {task.description || "*尚無備註內容*"}
                 </ReactMarkdown>

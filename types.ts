@@ -11,6 +11,15 @@ export enum TaskPriority {
   HIGH = '高'
 }
 
+export interface Attachment {
+  id: string;
+  name: string;
+  url: string;
+  path: string; // Firebase Storage 的路徑，用於刪除
+  type: string;
+  createdAt: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -22,6 +31,7 @@ export interface Task {
   priority: TaskPriority;
   color: string;
   relatedProjectId?: string;
+  attachments?: Attachment[];
 }
 
 export interface Project {
@@ -34,7 +44,8 @@ export interface Project {
   tasks: Task[];
   children: Project[];
   parentId: string | null;
-  lastAccessedAt?: string; // 最近一次查看的時間戳
+  lastAccessedAt?: string;
+  attachments?: Attachment[];
 }
 
 export type ViewType = 'dashboard' | 'gantt' | 'calendar' | 'notes';

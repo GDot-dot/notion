@@ -16,7 +16,9 @@
     "lucide-react": "^0.562.0",
     "date-fns": "^4.1.0",
     "recharts": "^3.6.0",
-    "firebase": "^10.8.0"
+    "firebase": "^10.8.0",
+    "react-markdown": "^9.0.0",
+    "remark-gfm": "^4.0.0"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",

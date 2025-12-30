@@ -180,7 +180,6 @@ const ProjectView: React.FC = () => {
       });
       const next = updater(state.projects);
       dispatch({ type: 'UPDATE_PROJECTS', projects: next });
-      // 同步但不更新 Loading，所以不呼叫 syncToCloud(next) 以免太頻繁，可等下次操作
     }
   }, [currentProject?.id]);
 
@@ -240,6 +239,7 @@ const ProjectView: React.FC = () => {
       status: TaskStatus.TODO,
       priority: TaskPriority.MEDIUM,
       color: COLORS.taskColors[Math.floor(Math.random() * COLORS.taskColors.length)],
+      attachments: []
     };
     updateProject(currentProject.id, { tasks: [...currentProject.tasks, newTask] });
     setEditingTaskId(newTask.id);
@@ -283,7 +283,8 @@ const ProjectView: React.FC = () => {
       precautionsColor: COLORS.stickyNotes[Math.floor(Math.random() * COLORS.stickyNotes.length)],
       tasks: [],
       children: [],
-      logoUrl: '📁'
+      logoUrl: '📁',
+      attachments: []
     };
     let next: Project[];
     if (!parentId) next = [...state.projects, newP];
@@ -408,7 +409,7 @@ const ProjectView: React.FC = () => {
               <div className="bg-white rounded-[32px] md:rounded-[40px] p-6 md:p-8 cute-shadow border border-pink-100">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
                   <h3 className="text-xl font-bold text-pink-600 flex items-center gap-3"><span className="p-2 bg-pink-100 rounded-xl text-pink-500"><Check size={20} /></span>任務清單</h3>
-                  <button onClick={addTask} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-pink-50 text-pink-500 px-6 py-2.5 rounded-2xl font-bold hover:bg-pink-100 shadow-sm transition-all"><Plus size={18} /> 新增任務</button>
+                  <button addTask={addTask} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-pink-50 text-pink-500 px-6 py-2.5 rounded-2xl font-bold hover:bg-pink-100 shadow-sm transition-all"><Plus size={18} /> 新增任務</button>
                 </div>
                 <div className="space-y-4">
                   {currentProject.tasks.map(task => (
@@ -436,7 +437,16 @@ const ProjectView: React.FC = () => {
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
               {activeView === 'gantt' && <GanttChart tasks={aggregatedTasks} />}
               {activeView === 'calendar' && <CalendarView tasks={aggregatedTasks} />}
-              {activeView === 'notes' && <NotesArea notes={currentProject.notes} logoUrl={currentProject.logoUrl} onUpdateNotes={(notes) => updateProject(currentProject.id, { notes })} onUpdateLogo={(url) => updateProject(currentProject.id, { logoUrl: url })} />}
+              {activeView === 'notes' && (
+                <NotesArea 
+                  notes={currentProject.notes} 
+                  logoUrl={currentProject.logoUrl} 
+                  attachments={currentProject.attachments}
+                  onUpdateNotes={(notes) => updateProject(currentProject.id, { notes })} 
+                  onUpdateLogo={(url) => updateProject(currentProject.id, { logoUrl: url })} 
+                  onUpdateAttachments={(files) => updateProject(currentProject.id, { attachments: files })}
+                />
+              )}
             </div>
           )}
         </div>
