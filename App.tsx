@@ -8,145 +8,12 @@ import { NotesArea } from './components/NotesArea.tsx';
 import { CalendarView } from './components/CalendarView.tsx';
 import { ProjectPrecautions } from './components/ProjectPrecautions.tsx';
 import { TaskDetailModal } from './components/TaskDetailModal.tsx';
-import { Project, ViewType, TaskStatus, Task, TaskPriority } from './types.ts';
+import { Project, ViewType, TaskStatus, Task, TaskPriority, Tag } from './types.ts';
 import { COLORS } from './constants.tsx';
 import { useProjects } from './context/ProjectContext.tsx';
-// Fix: Use consolidated exports from local firebase lib
 import { auth, googleProvider, isConfigured, signInWithPopup, signOut } from './lib/firebase.ts';
-import { Plus, LayoutDashboard, Calendar, BarChart2, BookOpen, Trash2, Check, Edit3, Menu, LogIn, ShieldAlert, Loader2, Save, CloudCheck, Search, X, FolderHeart, Sparkles, CloudOff } from 'lucide-react';
+import { Plus, LayoutDashboard, Calendar, BarChart2, BookOpen, Trash2, Check, Menu, LogIn, Loader2, Search, Filter } from 'lucide-react';
 import { addDays } from 'date-fns';
-
-// 🍓 搜尋面板組件
-const SearchPalette: React.FC<{ 
-  projects: Project[], 
-  onClose: () => void, 
-  onSelect: (id: string, type: 'project' | 'task') => void 
-}> = ({ projects, onClose, onSelect }) => {
-  const [query, setQuery] = useState('');
-  
-  const searchResults = useMemo(() => {
-    if (!query.trim()) return { projects: [], tasks: [] };
-    const q = query.toLowerCase();
-    const pResults: Project[] = [];
-    const tResults: { task: Task, projectId: string }[] = [];
-
-    const searchRecursive = (list: Project[]) => {
-      list.forEach(p => {
-        if (p.name.toLowerCase().includes(q)) pResults.push(p);
-        p.tasks.forEach(t => {
-          if (t.title.toLowerCase().includes(q) || t.description.toLowerCase().includes(q)) {
-            tResults.push({ task: t, projectId: p.id });
-          }
-        });
-        searchRecursive(p.children);
-      });
-    };
-    searchRecursive(projects);
-    return { projects: pResults, tasks: tResults };
-  }, [query, projects]);
-
-  return (
-    <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh] p-4 bg-pink-900/10 backdrop-blur-md animate-in fade-in duration-300" onClick={onClose}>
-      <div className="w-full max-w-2xl bg-white/90 backdrop-blur-xl rounded-[32px] shadow-2xl overflow-hidden border border-white flex flex-col max-h-[60vh] animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center gap-4 p-6 border-b border-pink-50">
-          <Search className="text-pink-400" />
-          <input 
-            autoFocus
-            placeholder="搜尋計畫、任務或內容... (Cmd+P)"
-            className="flex-1 bg-transparent border-none text-xl font-bold text-[#5c4b51] focus:outline-none placeholder:text-pink-200"
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-          />
-          <div className="flex gap-1">
-             <kbd className="hidden sm:inline-block px-2 py-1 bg-pink-50 text-pink-300 text-[10px] rounded-lg font-bold">ESC</kbd>
-          </div>
-        </div>
-        
-        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-          {query.trim() === '' ? (
-            <div className="text-center py-20 opacity-30">
-              <Sparkles size={48} className="mx-auto mb-4 text-pink-300" />
-              <p className="font-bold">輸入關鍵字開始快速導航 🍰</p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {searchResults.projects.length > 0 && (
-                <div>
-                  <h4 className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-3 ml-2">計畫項目 / Projects</h4>
-                  <div className="space-y-1">
-                    {searchResults.projects.map(p => (
-                      <div key={p.id} onClick={() => onSelect(p.id, 'project')} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-white hover:shadow-md cursor-pointer transition-all group">
-                        <div className="w-8 h-8 rounded-lg bg-pink-50 shadow-inner flex items-center justify-center border border-pink-100 group-hover:border-pink-300">
-                          {p.logoUrl?.length === 2 ? p.logoUrl : <FolderHeart size={16} className="text-pink-400" />}
-                        </div>
-                        <span className="font-bold text-[#5c4b51]">{p.name}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {searchResults.tasks.length > 0 && (
-                <div>
-                  <h4 className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-3 ml-2">任務項目 / Tasks</h4>
-                  <div className="space-y-1">
-                    {searchResults.tasks.map(({ task, projectId }) => (
-                      <div key={task.id} onClick={() => onSelect(projectId, 'task')} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-white hover:shadow-md cursor-pointer transition-all group">
-                        <div className="w-8 h-8 rounded-lg border-2 border-pink-200 flex items-center justify-center text-[10px] font-black text-pink-400 bg-white">
-                          {task.progress}%
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="font-bold text-[#5c4b51] text-sm">{task.title}</span>
-                          <span className="text-[10px] text-pink-300 opacity-60 truncate max-w-md">{task.description || '尚無描述'}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {searchResults.projects.length === 0 && searchResults.tasks.length === 0 && (
-                <div className="text-center py-10 opacity-30 font-bold">找不到相關內容 🥺</div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// 🍓 任務項
-const TaskItem = React.memo(({ task, onToggleStatus, onEdit, onDelete }: { 
-  task: Task, 
-  onToggleStatus: () => void, 
-  onEdit: () => void,
-  onDelete: () => void 
-}) => {
-  return (
-    <div className="flex items-center gap-4 p-4 md:p-5 rounded-[24px] md:rounded-3xl bg-pink-50/20 border border-pink-50 hover:bg-white hover:shadow-lg transition-all cursor-pointer group" onClick={onEdit}>
-      <div 
-        onClick={(e) => { e.stopPropagation(); onToggleStatus(); }}
-        className={`w-6 h-6 rounded-lg border-2 flex-shrink-0 flex items-center justify-center transition-all cursor-pointer ${
-          task.status === TaskStatus.COMPLETED ? 'bg-pink-400 border-pink-400 text-white shadow-inner scale-110' : 'bg-white border-pink-200 hover:border-pink-300'
-        }`}
-      >
-        {task.status === TaskStatus.COMPLETED && <Check size={16} strokeWidth={4} />}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className={`font-bold text-[#5c4b51] text-base md:text-lg truncate ${task.status === TaskStatus.COMPLETED ? 'line-through opacity-40' : ''}`}>{task.title}</p>
-      </div>
-      <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
-        <div className="px-3 py-1 rounded-full text-[10px] font-black border border-white/50 shadow-sm" style={{ backgroundColor: COLORS.status[task.status] }}>{task.status}</div>
-        <span className="text-sm font-bold text-pink-500 min-w-[32px]">{task.progress}%</span>
-        <button 
-          onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          className="p-2 text-pink-200 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-50 rounded-xl"
-        >
-          <Trash2 size={16} />
-        </button>
-      </div>
-    </div>
-  );
-});
 
 const ProjectView: React.FC = () => {
   const { projectId, view } = useParams<{ projectId: string, view: ViewType }>();
@@ -154,21 +21,9 @@ const ProjectView: React.FC = () => {
   const navigate = useNavigate();
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  
+  const [activeTagId, setActiveTagId] = useState<string | null>(null);
 
-  // 🍓 全域快捷鍵監聽 Cmd/Ctrl + P
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
-        e.preventDefault();
-        setIsSearchOpen(prev => !prev);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  // 輔助函式：在樹狀結構中尋找專案
   const findProject = useCallback((id: string, list: Project[]): Project | null => {
     for (const p of list) {
       if (p.id === id) return p;
@@ -184,22 +39,16 @@ const ProjectView: React.FC = () => {
 
   // 🍓 追蹤最近存取時間
   useEffect(() => {
-    if (currentProject) {
-      const now = new Date().toISOString();
-      if (currentProject.lastAccessedAt && (new Date().getTime() - new Date(currentProject.lastAccessedAt).getTime() < 1000 * 30)) return;
-      
-      const updater = (list: Project[]): Project[] => list.map(p => {
-        if (p.id === currentProject.id) return { ...p, lastAccessedAt: now };
-        return { ...p, children: updater(p.children) };
-      });
-      const next = updater(state.projects);
-      dispatch({ type: 'UPDATE_PROJECTS', projects: next });
+    if (currentProject && projectId) {
+      // 避免重複更新導致效能問題，僅在時間落後超過 1 分鐘時更新
+      const last = currentProject.lastAccessedAt ? new Date(currentProject.lastAccessedAt).getTime() : 0;
+      const now = Date.now();
+      if (now - last > 60000) {
+        updateProject(currentProject.id, { lastAccessedAt: new Date().toISOString() });
+      }
     }
-  }, [currentProject?.id]);
+  }, [projectId]);
 
-  const activeView = (view || 'dashboard') as ViewType;
-
-  // 輔助函式：遞迴獲取所有子專案的任務
   const getAggregatedTasks = useCallback((proj: Project): Task[] => {
     let tasks = [...proj.tasks];
     proj.children.forEach(child => {
@@ -208,11 +57,23 @@ const ProjectView: React.FC = () => {
     return tasks;
   }, []);
 
-  const aggregatedTasks = useMemo(() => {
+  const allTasks = useMemo(() => {
     return currentProject ? getAggregatedTasks(currentProject) : [];
   }, [currentProject, getAggregatedTasks]);
 
-  // 更新專案資訊
+  const availableTags = useMemo(() => {
+    const tagsMap = new Map<string, Tag>();
+    allTasks.forEach(t => {
+      t.tags?.forEach(tag => tagsMap.set(tag.id, tag));
+    });
+    return Array.from(tagsMap.values());
+  }, [allTasks]);
+
+  const filteredTasks = useMemo(() => {
+    if (!activeTagId) return allTasks;
+    return allTasks.filter(t => t.tags?.some(tag => tag.id === activeTagId));
+  }, [allTasks, activeTagId]);
+
   const updateProject = (id: string, updates: Partial<Project>) => {
     const updater = (list: Project[]): Project[] => list.map(p => {
       if (p.id === id) return { ...p, ...updates };
@@ -223,7 +84,22 @@ const ProjectView: React.FC = () => {
     syncToCloud(next);
   };
 
-  // 更新任務資訊
+  const deleteCurrentProject = () => {
+    if (!currentProject) return;
+    if (!confirm(`確定要刪除「${currentProject.name}」專案嗎？此動作無法復原 🍰`)) return;
+    
+    const remover = (list: Project[]): Project[] => {
+      return list.filter(p => p.id !== currentProject.id).map(p => ({
+        ...p,
+        children: remover(p.children)
+      }));
+    };
+    const next = remover(state.projects);
+    dispatch({ type: 'UPDATE_PROJECTS', projects: next });
+    syncToCloud(next);
+    navigate('/');
+  };
+
   const updateTask = (taskId: string, updates: Partial<Task>) => {
     const updater = (list: Project[]): Project[] => list.map(p => {
       const idx = p.tasks.findIndex(t => t.id === taskId);
@@ -239,26 +115,6 @@ const ProjectView: React.FC = () => {
     syncToCloud(next);
   };
 
-  const addTask = () => {
-    if (!currentProject) return;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const newTask: Task = {
-      id: Math.random().toString(36).substr(2, 9),
-      title: '新任務 🎀',
-      description: '',
-      startDate: today.toISOString(),
-      endDate: addDays(today, 2).toISOString(),
-      progress: 0,
-      status: TaskStatus.TODO,
-      priority: TaskPriority.MEDIUM,
-      color: COLORS.taskColors[Math.floor(Math.random() * COLORS.taskColors.length)],
-      attachments: []
-    };
-    updateProject(currentProject.id, { tasks: [...currentProject.tasks, newTask] });
-    setEditingTaskId(newTask.id);
-  };
-
   const deleteTask = (taskId: string) => {
     if (!confirm('確定要刪除這個任務嗎？ 🍬')) return;
     const remover = (list: Project[]): Project[] => list.map(p => ({
@@ -271,76 +127,32 @@ const ProjectView: React.FC = () => {
     syncToCloud(next);
   };
 
-  const deleteProject = (id: string) => {
-    if (state.projects.length === 1 && !state.projects[0].parentId) {
-      alert("至少需要保留一個計畫喔！🍭");
-      return;
-    }
-    if (!confirm('確定要刪除目前這個計畫嗎？ 🥺')) return;
-    const filter = (list: Project[]): Project[] => list.filter(p => p.id !== id).map(p => ({
-      ...p,
-      children: filter(p.children)
-    }));
-    const next = filter(state.projects);
-    dispatch({ type: 'UPDATE_PROJECTS', projects: next });
-    syncToCloud(next);
-    navigate('/');
-  };
-
-  const addProject = (parentId: string | null) => {
-    const newP: Project = {
+  const addNewProject = () => {
+    const name = prompt("🍓 請輸入新專案名稱");
+    if (!name) return;
+    const newProj: Project = {
       id: Math.random().toString(36).substr(2, 9),
-      name: '新計畫 🎀',
-      parentId,
-      notes: '',
+      name,
+      parentId: null,
+      notes: '# 新計畫 🎀',
+      logoUrl: '🍓',
       precautions: [],
-      precautionsColor: COLORS.stickyNotes[Math.floor(Math.random() * COLORS.stickyNotes.length)],
       tasks: [],
       children: [],
-      logoUrl: '📁',
-      attachments: []
+      lastAccessedAt: new Date().toISOString()
     };
-    let next: Project[];
-    if (!parentId) next = [...state.projects, newP];
-    else {
-      const updater = (list: Project[]): Project[] => list.map(p => {
-        if (p.id === parentId) return { ...p, children: [...p.children, newP] };
-        return { ...p, children: updater(p.children) };
-      });
-      next = updater(state.projects);
-    }
+    const next = [...state.projects, newProj];
     dispatch({ type: 'UPDATE_PROJECTS', projects: next });
     syncToCloud(next);
-    navigate(`/project/${newP.id}/dashboard`);
+    navigate(`/project/${newProj.id}/dashboard`);
   };
 
-  // 🍓 登入處理邏輯
-  const handleLogin = async () => {
-    if (!isConfigured) {
-      alert("🍭 需要先設定 Firebase 金鑰喔！\n\n請前往 lib/firebase.ts 檔案，將您的 Firebase 配置填入 firebaseConfig 物件中。");
-      return;
-    }
-    
-    if (!auth) return;
+  const activeView = (view || 'dashboard') as ViewType;
 
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (error: any) {
-      console.error("Login failed:", error);
-      alert(`登入失敗 🥺\n原因：${error.message || "未知錯誤"}\n請檢查 Firebase 控制台的 Google Auth 是否已啟用。`);
-    }
-  };
-
-  if (state.isLoading) return (
-    <div className="h-screen flex items-center justify-center bg-[#fff5f8]">
-      <Loader2 className="w-12 h-12 text-pink-400 animate-spin" />
-    </div>
-  );
+  if (!currentProject) return null;
 
   return (
     <div className="flex min-h-screen relative overflow-x-hidden bg-[#fff5f8]">
-      {isSidebarOpen && <div className="fixed inset-0 bg-pink-900/20 backdrop-blur-sm z-40 md:hidden" onClick={() => setIsSidebarOpen(false)} />}
-      
       <Sidebar 
         projects={state.projects} 
         workspaceLogo={state.workspaceLogo}
@@ -352,66 +164,84 @@ const ProjectView: React.FC = () => {
         selectedProjectId={currentProject.id} 
         isOpen={isSidebarOpen}
         onSelectProject={(id) => { navigate(`/project/${id}/${activeView}`); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
-        onAddProject={addProject}
+        onAddProject={() => {}}
       />
 
       <main className="flex-1 p-4 md:p-8 overflow-y-auto max-h-screen custom-scrollbar transition-all duration-300">
-        <header className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-6">
-          <div className="flex items-center gap-3 md:gap-6 group">
+        <header className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+          <div className="flex items-center gap-4">
             <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 text-pink-500 bg-white rounded-xl shadow-sm border border-pink-100">
               <Menu size={24} />
             </button>
-            <div className="relative cursor-pointer group" onClick={() => {
-              const res = prompt('請輸入 Emoji 或圖片網址 🍭', currentProject.logoUrl || '📁');
-              if (res !== null) updateProject(currentProject.id, { logoUrl: res });
-            }}>
-              <div className="w-12 h-12 md:w-20 md:h-20 bg-white rounded-2xl md:rounded-[32px] flex items-center justify-center text-2xl md:text-5xl shadow-inner border-2 border-pink-100 overflow-hidden">
-                {currentProject.logoUrl?.startsWith('http') || currentProject.logoUrl?.startsWith('blob') ? <img src={currentProject.logoUrl} className="w-full h-full object-cover" /> : (currentProject.logoUrl || '📁')}
-              </div>
-              <div className="absolute -bottom-1 -right-1 bg-pink-500 p-1.5 rounded-full shadow-md border-2 border-white transition-transform group-hover:scale-110"><Edit3 size={12} className="text-white" /></div>
-            </div>
-            <div className="flex-1 min-w-0">
-              <input value={currentProject.name} onChange={(e) => updateProject(currentProject.id, { name: e.target.value })} className="text-2xl md:text-4xl font-black text-pink-600 bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-pink-100 rounded-xl px-2 w-full truncate" />
-              <div className="flex items-center gap-2 mt-1 ml-2">
-                <div className="flex items-center gap-2 px-3 py-1 bg-white/40 rounded-full border border-pink-100 shadow-sm">
-                  {state.isSyncing ? (
-                    <><Loader2 size={12} className="text-pink-400 animate-spin" /><span className="text-[10px] text-pink-400 font-bold">處理中...</span></>
-                  ) : !isConfigured ? (
-                    <><CloudOff size={12} className="text-pink-300" /><span className="text-[10px] text-pink-400 font-bold">🍓 本機模式 (未填寫金鑰)</span></>
-                  ) : state.user ? (
-                    <><CloudCheck size={12} className="text-green-400" /><span className="text-[10px] text-green-500 font-bold">雲端已同步</span></>
-                  ) : (
-                    <><Save size={12} className="text-blue-400" /><span className="text-[10px] text-blue-500 font-bold">等待登入</span></>
-                  )}
-                </div>
-              </div>
-            </div>
+            <h1 className="text-3xl font-black text-pink-600 flex items-center gap-3">
+              <span className="text-4xl">{currentProject.logoUrl?.length === 2 ? currentProject.logoUrl : '🍓'}</span>
+              {currentProject.name}
+            </h1>
           </div>
           
-          <div className="flex items-center gap-2 md:gap-4">
-            <button 
-              onClick={() => setIsSearchOpen(true)}
-              className="p-2.5 bg-white text-pink-400 hover:text-pink-600 rounded-xl border border-pink-50 shadow-sm hover:bg-pink-50 transition-all flex items-center gap-2"
-            >
-              <Search size={20} /> <span className="hidden sm:inline font-bold text-sm">搜尋</span>
+          <div className="flex items-center gap-3">
+            <button className="flex items-center gap-2 bg-white px-5 py-2.5 rounded-2xl font-bold text-sm shadow-md border border-pink-50 text-pink-400 hover:bg-pink-50 transition-all">
+              <Search size={18} className="text-pink-400" /> 搜尋
             </button>
+
             {!state.user ? (
-              <button 
-                onClick={handleLogin} 
-                className={`flex items-center gap-2 bg-white px-4 py-2 rounded-xl font-bold text-sm shadow-md border border-blue-50 transition-all text-blue-500 hover:bg-blue-50 active:scale-95`}
-              >
+              <button onClick={() => signInWithPopup(auth!, googleProvider)} className="flex items-center gap-3 bg-white px-5 py-2.5 rounded-2xl font-bold text-sm shadow-md border border-blue-50 text-blue-500 hover:bg-blue-50 transition-all">
                 <LogIn size={18} /> Google 登入
               </button>
             ) : (
-              <div className="flex items-center gap-3 bg-white/60 p-1.5 pr-4 rounded-2xl border border-pink-100 shadow-sm">
-                <img src={state.user.photoURL || ''} className="w-8 h-8 rounded-full border-2 border-pink-200 shadow-sm" />
-                <button onClick={() => auth && signOut(auth)} className="text-[10px] font-bold text-pink-300 hover:text-red-400">登出</button>
+              <div className="flex items-center gap-3 bg-white px-2 py-1.5 pr-4 rounded-2xl border border-pink-100 shadow-sm">
+                <img src={state.user.photoURL || ''} className="w-8 h-8 rounded-full border-2 border-pink-200" />
+                <button onClick={() => signOut(auth!)} className="text-[10px] font-bold text-pink-300">登出</button>
               </div>
             )}
-            <button onClick={() => deleteProject(currentProject.id)} className="p-2.5 bg-white text-pink-300 hover:text-red-400 rounded-xl border border-pink-50 shadow-sm hover:bg-red-50 transition-colors"><Trash2 size={20} /></button>
-            <button onClick={() => addProject(currentProject.id)} className="flex items-center gap-2 bg-pink-500 text-white px-4 md:px-6 py-2 rounded-xl md:rounded-2xl font-bold text-xs md:text-sm shadow-md hover:bg-pink-600 transition-all active:scale-95"><Plus size={16} /> 建立計畫</button>
+
+            <button onClick={deleteCurrentProject} className="p-3 bg-white rounded-2xl shadow-md border border-pink-50 text-pink-300 hover:text-red-400 hover:border-red-100 transition-all">
+              <Trash2 size={20} />
+            </button>
+
+            <button onClick={addNewProject} className="flex items-center gap-2 bg-[#f04a94] text-white px-6 py-2.5 rounded-full font-bold text-sm shadow-lg hover:bg-pink-600 transition-all active:scale-95">
+              <Plus size={18} /> 建立計畫
+            </button>
           </div>
         </header>
+
+        {availableTags.length > 0 && (
+          <div className="flex items-center gap-3 mb-8 overflow-x-auto pb-2 no-scrollbar">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-pink-100 rounded-full text-pink-500">
+              <Filter size={14} />
+              <span className="text-xs font-black">標籤篩選</span>
+            </div>
+            
+            <button 
+              onClick={() => setActiveTagId(null)}
+              className={`px-5 py-1.5 rounded-full text-[12px] font-black border transition-all ${
+                !activeTagId ? 'bg-[#f04a94] text-white border-[#f04a94] shadow-md' : 'bg-white text-pink-300 border-pink-100 hover:bg-pink-50'
+              }`}
+            >
+              全部任務
+            </button>
+
+            {availableTags.map(tag => {
+              const isActive = activeTagId === tag.id;
+              return (
+                <button 
+                  key={tag.id}
+                  onClick={() => setActiveTagId(isActive ? null : tag.id)}
+                  className={`px-5 py-1.5 rounded-full text-[12px] font-black transition-all shadow-sm border ${
+                    isActive ? 'text-white shadow-pink-200' : 'bg-opacity-10'
+                  }`}
+                  style={{ 
+                    backgroundColor: isActive ? tag.color : `${tag.color}1A`,
+                    color: isActive ? '#fff' : tag.color,
+                    borderColor: isActive ? tag.color : `${tag.color}4D`
+                  }}
+                >
+                  {tag.text}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         <div className="flex gap-2 md:gap-4 mb-8 overflow-x-auto pb-2 no-scrollbar">
           {[
@@ -420,7 +250,7 @@ const ProjectView: React.FC = () => {
             { id: 'calendar', label: '日期表', icon: <Calendar size={18} /> },
             { id: 'notes', label: '設定', icon: <BookOpen size={18} /> },
           ].map(v => (
-            <button key={v.id} onClick={() => navigate(`/project/${currentProject.id}/${v.id}`)} className={`flex items-center gap-2 px-5 md:px-8 py-2 md:py-3 rounded-xl md:rounded-[20px] font-bold transition-all ${activeView === v.id ? 'bg-pink-500 text-white shadow-xl translate-y-[-2px]' : 'text-pink-300 bg-white/50 hover:bg-pink-50'}`}>
+            <button key={v.id} onClick={() => navigate(`/project/${currentProject.id}/${v.id}`)} className={`flex items-center gap-2 px-8 py-3 rounded-2xl font-bold transition-all ${activeView === v.id ? 'bg-[#f04a94] text-white shadow-xl translate-y-[-2px]' : 'text-pink-300 bg-white/50 hover:bg-pink-50'}`}>
               {v.icon} {v.label}
             </button>
           ))}
@@ -428,9 +258,9 @@ const ProjectView: React.FC = () => {
 
         <div className="space-y-8 md:space-y-12 pb-20 animate-in fade-in duration-500">
           {activeView === 'dashboard' ? (
-            <div className="space-y-8 md:space-y-12">
+            <div className="space-y-12">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
-                <ProgressBoard tasks={aggregatedTasks} />
+                <ProgressBoard tasks={filteredTasks} />
                 <ProjectPrecautions 
                   precautions={currentProject.precautions || []} 
                   backgroundColor={currentProject.precautionsColor}
@@ -438,38 +268,78 @@ const ProjectView: React.FC = () => {
                   onColorChange={(color) => updateProject(currentProject.id, { precautionsColor: color })}
                 />
               </div>
-              <GanttChart tasks={aggregatedTasks} />
-              <div className="bg-white rounded-[32px] md:rounded-[40px] p-6 md:p-8 cute-shadow border border-pink-100">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-                  <h3 className="text-xl font-bold text-pink-600 flex items-center gap-3"><span className="p-2 bg-pink-100 rounded-xl text-pink-500"><Check size={20} /></span>任務清單</h3>
-                  <button onClick={addTask} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-pink-50 text-pink-500 px-6 py-2.5 rounded-2xl font-bold hover:bg-pink-100 shadow-sm transition-all"><Plus size={18} /> 新增任務</button>
+              <GanttChart tasks={filteredTasks} />
+              <div className="bg-white rounded-[40px] p-8 border border-pink-100 cute-shadow">
+                <div className="flex justify-between items-center mb-8">
+                  <h3 className="text-xl font-bold text-pink-600 flex items-center gap-3">
+                    <span className="p-2 bg-pink-100 rounded-xl text-pink-500">
+                      <Check size={20} />
+                    </span>
+                    任務清單
+                  </h3>
                 </div>
-                <div className="space-y-4">
-                  {currentProject.tasks.map(task => (
-                    <TaskItem 
-                      key={task.id} 
-                      task={task} 
-                      onToggleStatus={() => {
-                        const s = task.status === TaskStatus.COMPLETED ? TaskStatus.TODO : TaskStatus.COMPLETED;
-                        updateTask(task.id, { status: s, progress: s === TaskStatus.COMPLETED ? 100 : 0 });
-                      }}
-                      onEdit={() => setEditingTaskId(task.id)}
-                      onDelete={() => deleteTask(task.id)}
-                    />
-                  ))}
-                  {currentProject.tasks.length === 0 && (
-                    <div className="text-center py-12 text-pink-200 font-bold italic border-2 border-dashed border-pink-50 rounded-3xl">
-                      快來新增你的第一個任務吧！🍭
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {filteredTasks.map(task => (
+                    <div key={task.id} onClick={() => setEditingTaskId(task.id)} className="flex items-center gap-4 p-5 rounded-[28px] bg-pink-50/20 border border-pink-50 hover:bg-white hover:shadow-lg transition-all cursor-pointer group">
+                       <div 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const newStatus = task.status === TaskStatus.COMPLETED ? TaskStatus.TODO : TaskStatus.COMPLETED;
+                            updateTask(task.id, { status: newStatus, progress: newStatus === TaskStatus.COMPLETED ? 100 : task.progress });
+                          }}
+                          className={`w-7 h-7 rounded-xl border-2 flex items-center justify-center transition-all ${task.status === TaskStatus.COMPLETED ? 'bg-pink-400 border-pink-400 text-white' : 'bg-white border-pink-100'}`}
+                        >
+                         {task.status === TaskStatus.COMPLETED && <Check size={16} strokeWidth={4} />}
+                       </div>
+                       <div className="flex-1 min-w-0">
+                         <p className={`font-black text-base text-[#5c4b51] ${task.status === TaskStatus.COMPLETED ? 'line-through opacity-40' : ''}`}>{task.title}</p>
+                         <div className="flex flex-wrap gap-1.5 mt-2">
+                           {task.tags?.map(tag => (
+                             <span key={tag.id} className="text-[10px] font-black px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: tag.color }}>{tag.text}</span>
+                           ))}
+                         </div>
+                       </div>
+                       <div className="flex items-center gap-3">
+                         <div className="text-sm font-black text-pink-400">{task.progress}%</div>
+                         <button 
+                            onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }}
+                            className="p-2 opacity-0 group-hover:opacity-100 text-pink-200 hover:text-red-400 transition-all"
+                          >
+                           <Trash2 size={16} />
+                         </button>
+                       </div>
                     </div>
-                  )}
+                  ))}
+                  <button 
+                    onClick={() => {
+                      const newTask: Task = {
+                        id: Math.random().toString(36).substr(2, 9),
+                        title: '新任務 🎀',
+                        description: '',
+                        startDate: new Date().toISOString(),
+                        endDate: addDays(new Date(), 3).toISOString(),
+                        progress: 0,
+                        status: TaskStatus.TODO,
+                        priority: TaskPriority.MEDIUM,
+                        color: '#ffb8d1',
+                        tags: [],
+                        attachments: []
+                      };
+                      updateProject(currentProject.id, { tasks: [...currentProject.tasks, newTask] });
+                      setEditingTaskId(newTask.id);
+                    }}
+                    className="flex items-center justify-center gap-2 p-5 rounded-[28px] border-2 border-dashed border-pink-100 text-pink-300 hover:border-pink-300 hover:text-pink-400 transition-all font-bold"
+                  >
+                    <Plus size={20} /> 新增計畫任務
+                  </button>
                 </div>
               </div>
-              <CalendarView tasks={aggregatedTasks} />
+              <CalendarView tasks={filteredTasks} />
             </div>
           ) : (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-              {activeView === 'gantt' && <GanttChart tasks={aggregatedTasks} />}
-              {activeView === 'calendar' && <CalendarView tasks={aggregatedTasks} />}
+            <div className="animate-in fade-in duration-500">
+              {activeView === 'gantt' && <GanttChart tasks={filteredTasks} />}
+              {activeView === 'calendar' && <CalendarView tasks={filteredTasks} />}
               {activeView === 'notes' && (
                 <NotesArea 
                   notes={currentProject.notes} 
@@ -485,20 +355,9 @@ const ProjectView: React.FC = () => {
         </div>
       </main>
 
-      {isSearchOpen && (
-        <SearchPalette 
-          projects={state.projects} 
-          onClose={() => setIsSearchOpen(false)} 
-          onSelect={(id, type) => {
-            navigate(`/project/${id}/dashboard`);
-            setIsSearchOpen(false);
-          }}
-        />
-      )}
-
-      {editingTaskId && aggregatedTasks.find(t => t.id === editingTaskId) && (
+      {editingTaskId && filteredTasks.find(t => t.id === editingTaskId) && (
         <TaskDetailModal 
-          task={aggregatedTasks.find(t => t.id === editingTaskId)!}
+          task={filteredTasks.find(t => t.id === editingTaskId)!}
           allProjects={state.projects}
           onClose={() => setEditingTaskId(null)}
           onUpdate={(up) => updateTask(editingTaskId, up)}
@@ -510,7 +369,6 @@ const ProjectView: React.FC = () => {
 
 const App: React.FC = () => {
   const { state } = useProjects();
-  
   return (
     <Routes>
       <Route path="/" element={state.projects.length > 0 ? <Navigate to={`/project/${state.projects[0].id}/dashboard`} /> : <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-pink-400" /></div>} />
