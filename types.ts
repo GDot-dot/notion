@@ -21,6 +21,12 @@ export interface Attachment {
   createdAt: string;
 }
 
+// 🍓 新增標籤介面
+export interface TaskTag {
+  name: string;
+  color: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -31,6 +37,7 @@ export interface Task {
   status: TaskStatus;
   priority: TaskPriority;
   color: string;
+  tags?: TaskTag[]; // 修改這裡：從 string[] 改為 TaskTag[]
   relatedProjectId?: string;
   attachments?: Attachment[];
 }

@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Routes, Route, Navigate, useParams, useNavigate } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar.tsx';
@@ -8,12 +7,12 @@ import { NotesArea } from './components/NotesArea.tsx';
 import { CalendarView } from './components/CalendarView.tsx';
 import { ProjectPrecautions } from './components/ProjectPrecautions.tsx';
 import { TaskDetailModal } from './components/TaskDetailModal.tsx';
-import { Project, ViewType, TaskStatus, Task, TaskPriority } from './types.ts';
+import { Project, ViewType, TaskStatus, Task, TaskPriority, TaskTag } from './types.ts';
 import { COLORS } from './constants.tsx';
 import { useProjects } from './context/ProjectContext.tsx';
 // Fix: Use consolidated exports from local firebase lib
 import { auth, googleProvider, isConfigured, signInWithPopup, signOut } from './lib/firebase.ts';
-import { Plus, LayoutDashboard, Calendar, BarChart2, BookOpen, Trash2, Check, Edit3, Menu, LogIn, ShieldAlert, Loader2, Save, CloudCheck, Search, X, FolderHeart, Sparkles, CloudOff } from 'lucide-react';
+import { Plus, LayoutDashboard, Calendar, BarChart2, BookOpen, Trash2, Check, Edit3, Menu, LogIn, ShieldAlert, Loader2, Save, CloudCheck, Search, X, FolderHeart, Sparkles, CloudOff, Filter, Tag } from 'lucide-react';
 import { addDays } from 'date-fns';
 
 // 🍓 搜尋面板組件
@@ -133,6 +132,21 @@ const TaskItem = React.memo(({ task, onToggleStatus, onEdit, onDelete }: {
       </div>
       <div className="flex-1 min-w-0">
         <p className={`font-bold text-[#5c4b51] text-base md:text-lg truncate ${task.status === TaskStatus.COMPLETED ? 'line-through opacity-40' : ''}`}>{task.title}</p>
+        
+        {/* 顯示標籤 - 更新為物件結構 */}
+        {task.tags && task.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1.5">
+            {task.tags.map(tag => (
+              <span 
+                key={tag.name} 
+                className="text-[9px] px-2 py-0.5 rounded-full font-bold text-[#5c4b51] opacity-80"
+                style={{ backgroundColor: tag.color }}
+              >
+                #{tag.name}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
       <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
         <div className="px-3 py-1 rounded-full text-[10px] font-black border border-white/50 shadow-sm" style={{ backgroundColor: COLORS.status[task.status] }}>{task.status}</div>
@@ -155,6 +169,7 @@ const ProjectView: React.FC = () => {
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]); // 🍓 標籤過濾狀態
 
   // 🍓 全域快捷鍵監聽 Cmd/Ctrl + P
   useEffect(() => {
@@ -212,6 +227,31 @@ const ProjectView: React.FC = () => {
     return currentProject ? getAggregatedTasks(currentProject) : [];
   }, [currentProject, getAggregatedTasks]);
 
+  // 🍓 計算所有可用的標籤 (Unique - 包含顏色)
+  const availableTags = useMemo(() => {
+    const tagsMap = new Map<string, string>(); // name -> color
+    aggregatedTasks.forEach(t => t.tags?.forEach(tag => {
+      if (!tagsMap.has(tag.name)) {
+        tagsMap.set(tag.name, tag.color);
+      }
+    }));
+    return Array.from(tagsMap.entries()).map(([name, color]) => ({ name, color }));
+  }, [aggregatedTasks]);
+
+  // 🍓 根據選取的標籤過濾任務
+  const filteredTasks = useMemo(() => {
+    if (selectedTags.length === 0) return aggregatedTasks;
+    return aggregatedTasks.filter(task => 
+      task.tags?.some(tag => selectedTags.includes(tag.name))
+    );
+  }, [aggregatedTasks, selectedTags]);
+
+  const toggleTagFilter = (tagName: string) => {
+    setSelectedTags(prev => 
+      prev.includes(tagName) ? prev.filter(t => t !== tagName) : [...prev, tagName]
+    );
+  };
+
   // 更新專案資訊
   const updateProject = (id: string, updates: Partial<Project>) => {
     const updater = (list: Project[]): Project[] => list.map(p => {
@@ -253,7 +293,8 @@ const ProjectView: React.FC = () => {
       status: TaskStatus.TODO,
       priority: TaskPriority.MEDIUM,
       color: COLORS.taskColors[Math.floor(Math.random() * COLORS.taskColors.length)],
-      attachments: []
+      attachments: [],
+      tags: []
     };
     updateProject(currentProject.id, { tasks: [...currentProject.tasks, newTask] });
     setEditingTaskId(newTask.id);
@@ -429,8 +470,37 @@ const ProjectView: React.FC = () => {
         <div className="space-y-8 md:space-y-12 pb-20 animate-in fade-in duration-500">
           {activeView === 'dashboard' ? (
             <div className="space-y-8 md:space-y-12">
+              {/* 🍓 標籤過濾器 (Tag Filter) */}
+              {availableTags.length > 0 && (
+                <div className="flex items-center gap-3 overflow-x-auto pb-2 no-scrollbar px-1">
+                  <div className="flex items-center gap-2 text-pink-300 font-bold text-xs px-2 whitespace-nowrap">
+                    <Filter size={14} /> 過濾標籤:
+                  </div>
+                  {availableTags.map(tag => {
+                    const isSelected = selectedTags.includes(tag.name);
+                    return (
+                      <button
+                        key={tag.name}
+                        onClick={() => toggleTagFilter(tag.name)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${isSelected ? 'shadow-md scale-105 border-2 border-white' : 'opacity-60 grayscale hover:grayscale-0 hover:opacity-100'}`}
+                        style={{ backgroundColor: tag.color, color: '#5c4b51' }}
+                      >
+                        <Tag size={10} className={isSelected ? 'fill-current' : ''} />
+                        {tag.name}
+                        {isSelected && <Check size={10} />}
+                      </button>
+                    );
+                  })}
+                  {selectedTags.length > 0 && (
+                    <button onClick={() => setSelectedTags([])} className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-400 text-xs font-bold hover:bg-gray-200 ml-2">
+                      清除
+                    </button>
+                  )}
+                </div>
+              )}
+
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
-                <ProgressBoard tasks={aggregatedTasks} />
+                <ProgressBoard tasks={filteredTasks} />
                 <ProjectPrecautions 
                   precautions={currentProject.precautions || []} 
                   backgroundColor={currentProject.precautionsColor}
@@ -438,38 +508,41 @@ const ProjectView: React.FC = () => {
                   onColorChange={(color) => updateProject(currentProject.id, { precautionsColor: color })}
                 />
               </div>
-              <GanttChart tasks={aggregatedTasks} />
+              
+              <GanttChart tasks={filteredTasks} />
+              
               <div className="bg-white rounded-[32px] md:rounded-[40px] p-6 md:p-8 cute-shadow border border-pink-100">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
                   <h3 className="text-xl font-bold text-pink-600 flex items-center gap-3"><span className="p-2 bg-pink-100 rounded-xl text-pink-500"><Check size={20} /></span>任務清單</h3>
                   <button onClick={addTask} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-pink-50 text-pink-500 px-6 py-2.5 rounded-2xl font-bold hover:bg-pink-100 shadow-sm transition-all"><Plus size={18} /> 新增任務</button>
                 </div>
                 <div className="space-y-4">
-                  {currentProject.tasks.map(task => (
-                    <TaskItem 
-                      key={task.id} 
-                      task={task} 
-                      onToggleStatus={() => {
-                        const s = task.status === TaskStatus.COMPLETED ? TaskStatus.TODO : TaskStatus.COMPLETED;
-                        updateTask(task.id, { status: s, progress: s === TaskStatus.COMPLETED ? 100 : 0 });
-                      }}
-                      onEdit={() => setEditingTaskId(task.id)}
-                      onDelete={() => deleteTask(task.id)}
-                    />
-                  ))}
-                  {currentProject.tasks.length === 0 && (
+                  {filteredTasks.length > 0 ? (
+                    filteredTasks.map(task => (
+                      <TaskItem 
+                        key={task.id} 
+                        task={task} 
+                        onToggleStatus={() => {
+                          const s = task.status === TaskStatus.COMPLETED ? TaskStatus.TODO : TaskStatus.COMPLETED;
+                          updateTask(task.id, { status: s, progress: s === TaskStatus.COMPLETED ? 100 : 0 });
+                        }}
+                        onEdit={() => setEditingTaskId(task.id)}
+                        onDelete={() => deleteTask(task.id)}
+                      />
+                    ))
+                  ) : (
                     <div className="text-center py-12 text-pink-200 font-bold italic border-2 border-dashed border-pink-50 rounded-3xl">
-                      快來新增你的第一個任務吧！🍭
+                      {selectedTags.length > 0 ? '沒有符合選取標籤的任務喔 🥺' : '快來新增你的第一個任務吧！🍭'}
                     </div>
                   )}
                 </div>
               </div>
-              <CalendarView tasks={aggregatedTasks} />
+              <CalendarView tasks={filteredTasks} />
             </div>
           ) : (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-              {activeView === 'gantt' && <GanttChart tasks={aggregatedTasks} />}
-              {activeView === 'calendar' && <CalendarView tasks={aggregatedTasks} />}
+              {activeView === 'gantt' && <GanttChart tasks={filteredTasks} />}
+              {activeView === 'calendar' && <CalendarView tasks={filteredTasks} />}
               {activeView === 'notes' && (
                 <NotesArea 
                   notes={currentProject.notes} 
@@ -511,11 +584,14 @@ const ProjectView: React.FC = () => {
 const App: React.FC = () => {
   const { state } = useProjects();
   
+  // Find a default project ID to redirect to
+  const defaultProjectId = state.projects.length > 0 ? state.projects[0].id : 'root-1';
+
   return (
     <Routes>
-      <Route path="/" element={state.projects.length > 0 ? <Navigate to={`/project/${state.projects[0].id}/dashboard`} /> : <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-pink-400" /></div>} />
+      <Route path="/" element={<Navigate to={`/project/${defaultProjectId}/dashboard`} replace />} />
       <Route path="/project/:projectId/:view" element={<ProjectView />} />
-      <Route path="*" element={<Navigate to="/" />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 };

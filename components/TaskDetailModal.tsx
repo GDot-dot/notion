@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Flag, AlignLeft, CheckCircle2, Eye, Edit3, Link as LinkIcon, ExternalLink, Trash2, Plus, Globe, ImageIcon, Save } from 'lucide-react';
-import { Task, TaskPriority, TaskStatus, Project, Attachment, ResourceCategory } from '../types.ts';
-import { COLORS } from '../constants.tsx';
+import { X, Calendar, Flag, AlignLeft, CheckCircle2, Eye, Edit3, Link as LinkIcon, ExternalLink, Trash2, Plus, Globe, ImageIcon, Save, Tag, Check, Palette } from 'lucide-react';
+import { Task, TaskPriority, TaskStatus, Project, Attachment, ResourceCategory, TaskTag } from '../types.ts';
+import { COLORS, TAG_PALETTE } from '../constants.tsx';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -18,6 +18,12 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
   const [isEditingDesc, setIsEditingDesc] = useState(false);
   const [showPreviewDuringEdit, setShowPreviewDuringEdit] = useState(false);
   const [tempDesc, setTempDesc] = useState(task.description || '');
+  
+  // 標籤輸入狀態
+  const [tagInput, setTagInput] = useState('');
+  // 預設隨機選一個顏色
+  const [selectedTagColor, setSelectedTagColor] = useState(TAG_PALETTE[Math.floor(Math.random() * TAG_PALETTE.length)]);
+  const [isPaletteOpen, setIsPaletteOpen] = useState(false);
 
   // 當外部 task 改變時（如切換任務），同步內容
   useEffect(() => {
@@ -59,6 +65,28 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
       createdAt: new Date().toISOString()
     };
     onUpdate({ attachments: [...(task.attachments || []), newAttachment] });
+  };
+
+  const handleAddTag = () => {
+    const tagName = tagInput.trim();
+    if (!tagName) return;
+    
+    const currentTags = task.tags || [];
+    // 檢查是否已存在同名標籤
+    if (!currentTags.some(t => t.name === tagName)) {
+      const newTag: TaskTag = {
+        name: tagName,
+        color: selectedTagColor
+      };
+      onUpdate({ tags: [...currentTags, newTag] });
+    }
+    setTagInput('');
+    // 重新隨機一個顏色，方便下次新增
+    setSelectedTagColor(TAG_PALETTE[Math.floor(Math.random() * TAG_PALETTE.length)]);
+  };
+
+  const handleRemoveTag = (tagNameToRemove: string) => {
+    onUpdate({ tags: (task.tags || []).filter(t => t.name !== tagNameToRemove) });
   };
 
   return (
@@ -110,6 +138,65 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
               >
                 {Object.values(TaskPriority).map(p => <option key={p} value={p}>{p}</option>)}
               </select>
+            </div>
+          </div>
+
+          {/* 🍓 標籤管理區域 (更新版) */}
+          <div className="space-y-3">
+            <label className="text-xs font-bold text-pink-300 flex items-center gap-1 uppercase tracking-wider"><Tag size={12} /> 標籤 (Tags)</label>
+            <div className="bg-pink-50/20 p-3 rounded-2xl border border-pink-50 space-y-3">
+              {/* 現有標籤列表 */}
+              <div className="flex flex-wrap gap-2">
+                {task.tags && task.tags.map(tag => (
+                  <span 
+                    key={tag.name} 
+                    className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold text-[#5c4b51] shadow-sm transition-transform hover:scale-105"
+                    style={{ backgroundColor: tag.color }}
+                  >
+                    #{tag.name}
+                    <button onClick={() => handleRemoveTag(tag.name)} className="hover:text-red-500 rounded-full p-0.5"><X size={10} /></button>
+                  </span>
+                ))}
+                {(!task.tags || task.tags.length === 0) && <span className="text-xs text-pink-200 italic p-1">尚無標籤...</span>}
+              </div>
+
+              {/* 新增標籤介面 */}
+              <div className="flex flex-col gap-2">
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <input 
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleAddTag()}
+                      placeholder="輸入標籤..."
+                      className="w-full bg-white border border-pink-100 rounded-xl pl-3 pr-8 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-pink-100"
+                    />
+                    <div 
+                      className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border border-pink-100 shadow-sm cursor-pointer hover:scale-110 transition-transform"
+                      style={{ backgroundColor: selectedTagColor }}
+                      onClick={() => setIsPaletteOpen(!isPaletteOpen)}
+                      title="點擊選擇顏色"
+                    />
+                  </div>
+                  <button onClick={handleAddTag} className="bg-pink-100 text-pink-500 px-3 rounded-xl hover:bg-pink-200 transition-colors"><Plus size={16} /></button>
+                </div>
+
+                {/* 顏色選擇器 (可展開) */}
+                {isPaletteOpen && (
+                  <div className="grid grid-cols-8 gap-2 bg-white p-3 rounded-xl border border-pink-100 shadow-sm animate-in zoom-in-95 duration-200">
+                    {TAG_PALETTE.map(color => (
+                      <button
+                        key={color}
+                        onClick={() => { setSelectedTagColor(color); setIsPaletteOpen(false); }}
+                        className="w-6 h-6 rounded-full border border-pink-50 hover:scale-110 transition-transform flex items-center justify-center"
+                        style={{ backgroundColor: color }}
+                      >
+                        {selectedTagColor === color && <Check size={12} className="text-[#5c4b51]/60" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

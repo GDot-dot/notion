@@ -32,6 +32,24 @@ export const COLORS = {
   }
 };
 
+// 🍓 標籤專用粉嫩色票
+export const TAG_PALETTE = [
+  '#FFCDD2', '#F8BBD0', '#E1BEE7', '#D1C4E9', 
+  '#C5CAE9', '#BBDEFB', '#B3E5FC', '#B2EBF2', 
+  '#B2DFDB', '#C8E6C9', '#DCEDC8', '#F0F4C3', 
+  '#FFF9C4', '#FFECB3', '#FFE0B2', '#FFCCBC'
+];
+
+// 🎨 根據標籤名稱產生固定的顏色 (保留此函數作為 fallback 或其他用途)
+export const getTagColor = (tagName: string) => {
+  let hash = 0;
+  for (let i = 0; i < tagName.length; i++) {
+    hash = tagName.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % TAG_PALETTE.length;
+  return TAG_PALETTE[index];
+};
+
 const MARKDOWN_EXAMPLE = `# 🍓 歡迎來到您的 Melody 空間！
 
 這是一個強大的筆記區域，支援完整的 **Markdown** 語法。您可以嘗試以下功能：
@@ -78,7 +96,11 @@ export const INITIAL_PROJECTS: Project[] = [
         progress: 30,
         status: TaskStatus.IN_PROGRESS,
         priority: TaskPriority.MEDIUM,
-        color: '#ffb8d1'
+        color: '#ffb8d1',
+        tags: [
+          { name: '入門', color: '#FFCDD2' },
+          { name: '教學', color: '#B3E5FC' }
+        ]
       }
     ],
     children: [
