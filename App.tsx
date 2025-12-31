@@ -1,19 +1,20 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Routes, Route, Navigate, useParams, useNavigate } from 'react-router-dom';
-import { Sidebar } from './components/Sidebar.tsx';
-import { GanttChart } from './components/GanttChart.tsx';
-import { ProgressBoard } from './components/ProgressBoard.tsx';
-import { NotesArea } from './components/NotesArea.tsx';
-import { CalendarView } from './components/CalendarView.tsx';
-import { ProjectPrecautions } from './components/ProjectPrecautions.tsx';
-import { TaskDetailModal } from './components/TaskDetailModal.tsx';
-import { Project, ViewType, TaskStatus, Task, TaskPriority, TaskTag } from './types.ts';
+import { Sidebar } from './components/Sidebar';
+import { GanttChart } from './components/GanttChart';
+import { ProgressBoard } from './components/ProgressBoard';
+import { NotesArea } from './components/NotesArea';
+import { CalendarView } from './components/CalendarView';
+import { ProjectPrecautions } from './components/ProjectPrecautions';
+import { TaskDetailModal } from './components/TaskDetailModal';
+import { ReminderPopup } from './components/ReminderPopup';
+import { Project, ViewType, TaskStatus, Task, TaskPriority } from './types.ts';
 import { COLORS } from './constants.tsx';
-import { useProjects } from './context/ProjectContext.tsx';
-// Fix: Use consolidated exports from local firebase lib
+import { useProjects } from './context/ProjectContext';
 import { auth, googleProvider, isConfigured, signInWithPopup, signOut } from './lib/firebase.ts';
-import { Plus, LayoutDashboard, Calendar, BarChart2, BookOpen, Trash2, Check, Edit3, Menu, LogIn, ShieldAlert, Loader2, Save, CloudCheck, Search, X, FolderHeart, Sparkles, CloudOff, Filter, Tag } from 'lucide-react';
-import { addDays } from 'date-fns';
+import { Plus, LayoutDashboard, Calendar, BarChart2, BookOpen, Trash2, Check, Edit3, Menu, LogIn, Loader2, Save, CloudCheck, Search, FolderHeart, Sparkles, CloudOff, Filter, Tag, Bell } from 'lucide-react';
+import { addDays, format } from 'date-fns';
 
 // 🍓 搜尋面板組件
 const SearchPalette: React.FC<{ 
@@ -96,6 +97,7 @@ const SearchPalette: React.FC<{
                         <div className="flex flex-col">
                           <span className="font-bold text-[#5c4b51] text-sm">{task.title}</span>
                           <span className="text-[10px] text-pink-300 opacity-60 truncate max-w-md">{task.description || '尚無描述'}</span>
+                          {task.reminder?.type && task.reminder.type !== 'none' && <span className="text-[9px] text-blue-400 flex items-center gap-1"><Bell size={8}/> 有設定提醒</span>}
                         </div>
                       </div>
                     ))}
@@ -134,19 +136,21 @@ const TaskItem = React.memo(({ task, onToggleStatus, onEdit, onDelete }: {
         <p className={`font-bold text-[#5c4b51] text-base md:text-lg truncate ${task.status === TaskStatus.COMPLETED ? 'line-through opacity-40' : ''}`}>{task.title}</p>
         
         {/* 顯示標籤 - 更新為物件結構 */}
-        {task.tags && task.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-1.5">
-            {task.tags.map(tag => (
-              <span 
-                key={tag.name} 
-                className="text-[9px] px-2 py-0.5 rounded-full font-bold text-[#5c4b51] opacity-80"
-                style={{ backgroundColor: tag.color }}
-              >
-                #{tag.name}
-              </span>
-            ))}
-          </div>
-        )}
+        <div className="flex flex-wrap gap-1 mt-1.5 items-center">
+          {task.tags && task.tags.length > 0 && task.tags.map(tag => (
+            <span 
+              key={tag.name} 
+              className="text-[9px] px-2 py-0.5 rounded-full font-bold text-[#5c4b51] opacity-80"
+              style={{ backgroundColor: tag.color }}
+            >
+              #{tag.name}
+            </span>
+          ))}
+          {/* 提醒圖示 */}
+          {task.reminder && task.reminder.type !== 'none' && task.status !== TaskStatus.COMPLETED && (
+            <span className="text-blue-400" title="已設定提醒"><Bell size={12} fill="currentColor" className="opacity-60" /></span>
+          )}
+        </div>
       </div>
       <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
         <div className="px-3 py-1 rounded-full text-[10px] font-black border border-white/50 shadow-sm" style={{ backgroundColor: COLORS.status[task.status] }}>{task.status}</div>
@@ -165,7 +169,7 @@ const TaskItem = React.memo(({ task, onToggleStatus, onEdit, onDelete }: {
 const ProjectView: React.FC = () => {
   const { projectId, view } = useParams<{ projectId: string, view: ViewType }>();
   const { state, dispatch, syncToCloud } = useProjects();
-  const navigate = useNavigate();
+  const navigate = useNavigate(); 
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -299,7 +303,7 @@ const ProjectView: React.FC = () => {
     updateProject(currentProject.id, { tasks: [...currentProject.tasks, newTask] });
     setEditingTaskId(newTask.id);
   };
-
+  
   const deleteTask = (taskId: string) => {
     if (!confirm('確定要刪除這個任務嗎？ 🍬')) return;
     const remover = (list: Project[]): Project[] => list.map(p => ({
@@ -313,19 +317,37 @@ const ProjectView: React.FC = () => {
   };
 
   const deleteProject = (id: string) => {
-    if (state.projects.length === 1 && !state.projects[0].parentId) {
-      alert("至少需要保留一個計畫喔！🍭");
-      return;
-    }
     if (!confirm('確定要刪除目前這個計畫嗎？ 🥺')) return;
+    
     const filter = (list: Project[]): Project[] => list.filter(p => p.id !== id).map(p => ({
       ...p,
       children: filter(p.children)
     }));
-    const next = filter(state.projects);
+    
+    let next = filter(state.projects);
+
+    if (next.length === 0) {
+      const defaultProject: Project = {
+        id: Math.random().toString(36).substr(2, 9),
+        name: '我的新計畫 🎀',
+        parentId: null,
+        notes: '# 歡迎來到 Melody 專案管理 🍓\n\n這裡是您的新起點！',
+        precautions: ['試著新增一些任務吧！', '可以更換專案 Logo 喔'],
+        precautionsColor: COLORS.stickyNotes[Math.floor(Math.random() * COLORS.stickyNotes.length)],
+        tasks: [],
+        children: [],
+        logoUrl: '✨',
+        attachments: []
+      };
+      next = [defaultProject];
+    }
+
     dispatch({ type: 'UPDATE_PROJECTS', projects: next });
     syncToCloud(next);
-    navigate('/');
+    
+    if (!findProject(currentProject.id, next)) {
+       navigate(`/project/${next[0].id}/dashboard`);
+    }
   };
 
   const addProject = (parentId: string | null) => {
@@ -355,15 +377,12 @@ const ProjectView: React.FC = () => {
     navigate(`/project/${newP.id}/dashboard`);
   };
 
-  // 🍓 登入處理邏輯
   const handleLogin = async () => {
     if (!isConfigured) {
       alert("🍭 需要先設定 Firebase 金鑰喔！\n\n請前往 lib/firebase.ts 檔案，將您的 Firebase 配置填入 firebaseConfig 物件中。");
       return;
     }
-    
     if (!auth) return;
-
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (error: any) {
@@ -392,7 +411,10 @@ const ProjectView: React.FC = () => {
         }}
         selectedProjectId={currentProject.id} 
         isOpen={isSidebarOpen}
-        onSelectProject={(id) => { navigate(`/project/${id}/${activeView}`); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
+        onSelectProject={(id) => { 
+          navigate(`/project/${id}/${activeView}`);
+          if (window.innerWidth < 768) setIsSidebarOpen(false); 
+        }}
         onAddProject={addProject}
       />
 
@@ -583,16 +605,134 @@ const ProjectView: React.FC = () => {
 
 const App: React.FC = () => {
   const { state } = useProjects();
+  const [reminderTasks, setReminderTasks] = useState<Task[]>([]);
+  const projectsRef = useRef(state.projects);
   
-  // Find a default project ID to redirect to
   const defaultProjectId = state.projects.length > 0 ? state.projects[0].id : 'root-1';
 
+  // 🍓 同步專案資料到 Ref，供計時器使用 (避免 Closure 陷阱)
+  useEffect(() => {
+    projectsRef.current = state.projects;
+  }, [state.projects]);
+
+  // 🍓 任務提醒邏輯 (每 2 秒檢查一次，精確鎖定分鐘窗口)
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      // 靜默請求權限，或等待使用者在設定點擊
+    }
+
+    const checkReminders = () => {
+      const now = new Date();
+      const nowTime = now.getTime();
+      const notifiedKey = 'melody_notified_tasks';
+      const notifiedMap = JSON.parse(localStorage.getItem(notifiedKey) || '{}');
+      
+      let hasUpdates = false;
+      const tasksToNotify: Task[] = [];
+      const allTasks: Task[] = [];
+
+      const traverse = (list: Project[]) => {
+        list.forEach(p => {
+          allTasks.push(...p.tasks);
+          traverse(p.children);
+        });
+      };
+      
+      traverse(projectsRef.current);
+
+      allTasks.forEach(task => {
+        // 1. 基本過濾：任務已完成、無設定提醒、或提醒類型為 none -> 跳過
+        if (task.status === TaskStatus.COMPLETED || !task.reminder || task.reminder.type === 'none') return;
+        
+        let triggerTime: Date | null = null;
+        const endDate = new Date(task.endDate);
+        
+        if (task.reminder.type === '1_day') {
+          triggerTime = addDays(endDate, -1);
+        } else if (task.reminder.type === '3_days') {
+          triggerTime = addDays(endDate, -3);
+        } else if (task.reminder.type === 'custom' && task.reminder.date) {
+          triggerTime = new Date(task.reminder.date);
+        }
+
+        if (triggerTime) {
+          const triggerTs = triggerTime.getTime();
+          const diffMs = nowTime - triggerTs;
+
+          // 🍓 核心邏輯：
+          // 只有在「目標時間」開始後的 60 秒內 (0 <= diffMs < 60000) 才會觸發。
+          // 這樣保證了：
+          // 1. 時間還沒到 (diffMs < 0) -> 不觸發
+          // 2. 時間剛到 (0 <= diffMs < 60000) -> 觸發 (並檢查是否已通知過)
+          // 3. 時間已過 (diffMs >= 60000) -> 不再觸發 (過期不補發)
+          
+          if (diffMs >= 0 && diffMs < 60000) {
+            // 使用 [ID + 類型 + 時間戳] 作為唯一 Key
+            // 如果使用者修改時間，時間戳變動，Key 變動，就會重新觸發
+            const uniqueKey = `${task.id}_${task.reminder.type}_${triggerTs}`;
+            
+            // 檢查 LocalStorage 是否已經通知過這個 Key
+            if (!notifiedMap[uniqueKey]) {
+              tasksToNotify.push(task);
+
+              // A. 發送系統通知
+              if ('Notification' in window && Notification.permission === 'granted') {
+                 try {
+                   new Notification(`⏰ 任務提醒：${task.title}`, {
+                     body: `您的任務即將在 ${format(endDate, 'MM/dd HH:mm')} 到期！\n目前進度：${task.progress}%`,
+                     icon: '/vite.svg' 
+                   });
+                 } catch (e) { console.error('Notification error', e); }
+              }
+
+              // 記錄已通知，避免這一分鐘內重複跳出
+              notifiedMap[uniqueKey] = nowTime;
+              hasUpdates = true;
+            }
+          }
+        }
+      });
+
+      if (hasUpdates) {
+        localStorage.setItem(notifiedKey, JSON.stringify(notifiedMap));
+      }
+
+      // B. 觸發網頁彈窗 (In-App Popup)
+      if (tasksToNotify.length > 0) {
+        setReminderTasks(prev => {
+           // 避免重複 ID 加入
+           const existingIds = new Set(prev.map(t => t.id));
+           const newTasks = tasksToNotify.filter(t => !existingIds.has(t.id));
+           return [...prev, ...newTasks];
+        });
+      }
+    };
+
+    // 每 2 秒檢查一次，確保不會錯過那一分鐘的窗口
+    const intervalId = setInterval(checkReminders, 2000);
+    
+    // 立即執行一次
+    checkReminders(); 
+
+    return () => clearInterval(intervalId);
+  }, []); 
+
   return (
-    <Routes>
-      <Route path="/" element={<Navigate to={`/project/${defaultProjectId}/dashboard`} replace />} />
-      <Route path="/project/:projectId/:view" element={<ProjectView />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/" element={<Navigate to={`/project/${defaultProjectId}/dashboard`} replace />} />
+        <Route path="/project/:projectId/:view" element={<ProjectView />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      
+      {/* 🍓 網頁內彈出提醒視窗 */}
+      {reminderTasks.length > 0 && (
+        <ReminderPopup 
+          tasks={reminderTasks} 
+          onClose={() => setReminderTasks([])} 
+        />
+      )}
+    </>
   );
 };
 

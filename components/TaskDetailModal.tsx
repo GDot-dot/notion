@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Flag, AlignLeft, CheckCircle2, Eye, Edit3, Link as LinkIcon, ExternalLink, Trash2, Plus, Globe, ImageIcon, Save, Tag, Check, Palette } from 'lucide-react';
-import { Task, TaskPriority, TaskStatus, Project, Attachment, ResourceCategory, TaskTag } from '../types.ts';
+import { X, Calendar, Flag, AlignLeft, CheckCircle2, Eye, Edit3, Link as LinkIcon, ExternalLink, Trash2, Plus, Globe, ImageIcon, Save, Tag, Check, Palette, Bell, Clock, Activity, Send } from 'lucide-react';
+import { Task, TaskPriority, TaskStatus, Project, Attachment, ResourceCategory, TaskTag, ReminderType } from '../types.ts';
 import { COLORS, TAG_PALETTE } from '../constants.tsx';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { format } from 'date-fns';
 
 interface TaskDetailModalProps {
   task: Task;
@@ -24,6 +25,10 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
   // 預設隨機選一個顏色
   const [selectedTagColor, setSelectedTagColor] = useState(TAG_PALETTE[Math.floor(Math.random() * TAG_PALETTE.length)]);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
+  // 通知權限狀態
+  const [permissionState, setPermissionState] = useState(
+    'Notification' in window ? Notification.permission : 'default'
+  );
 
   // 當外部 task 改變時（如切換任務），同步內容
   useEffect(() => {
@@ -89,6 +94,71 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
     onUpdate({ tags: (task.tags || []).filter(t => t.name !== tagNameToRemove) });
   };
 
+  // ⏰ 提醒設定處理
+  const handleReminderChange = (type: ReminderType) => {
+    if (type === 'none') {
+      onUpdate({ reminder: undefined });
+    } else if (type === 'custom') {
+      // 預設為目前時間往後一小時
+      const now = new Date();
+      now.setHours(now.getHours() + 1);
+      // 修正：產生符合 datetime-local 格式的時間字串 (yyyy-MM-ddThh:mm)
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const defaultIso = `${year}-${month}-${day}T${hours}:${minutes}`;
+      
+      onUpdate({ reminder: { type, date: defaultIso } });
+    } else {
+      onUpdate({ reminder: { type } });
+    }
+  };
+
+  const handleCustomDateChange = (dateStr: string) => {
+    if (task.reminder && task.reminder.type === 'custom') {
+      onUpdate({ reminder: { ...task.reminder, date: dateStr } });
+    }
+  };
+
+  // 🍓 手動請求權限按鈕
+  const requestNotificationPermission = async () => {
+    if (!('Notification' in window)) {
+      alert("您的瀏覽器不支援通知功能 🥺");
+      return;
+    }
+
+    if (Notification.permission === 'denied') {
+      alert("❌ 通知已被封鎖\n\n請點擊網址列左側的「鎖頭」圖示，手動將「通知」改為「允許」，然後重新整理網頁。");
+      return;
+    }
+
+    const permission = await Notification.requestPermission();
+    setPermissionState(permission);
+    
+    if (permission === 'granted') {
+      // 立即發送一個測試通知
+      sendTestNotification();
+    }
+  };
+
+  // 🍓 立即測試通知
+  const sendTestNotification = () => {
+    if (!('Notification' in window)) {
+        alert("瀏覽器不支援");
+        return;
+    }
+    if (Notification.permission === 'granted') {
+        new Notification('🔔 測試成功！', {
+            body: `這是來自任務「${task.title}」的測試通知，這樣表示設定沒問題囉！`,
+            icon: '/vite.svg'
+        });
+    } else {
+        requestNotificationPermission();
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-[60] flex justify-end bg-black/20 backdrop-blur-sm animate-in fade-in duration-300" onClick={onClose}>
       <div 
@@ -138,6 +208,107 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
               >
                 {Object.values(TaskPriority).map(p => <option key={p} value={p}>{p}</option>)}
               </select>
+            </div>
+          </div>
+
+          {/* 🍓 任務進度 */}
+          <div className="space-y-2 bg-white/50 p-4 rounded-2xl border border-pink-50 shadow-sm">
+            <div className="flex justify-between items-center">
+                <label className="text-xs font-bold text-pink-300 flex items-center gap-1 uppercase tracking-wider">
+                   <Activity size={14} /> 任務進度
+                </label>
+                <span className="text-sm font-black text-pink-500 bg-white px-2 py-0.5 rounded-lg shadow-sm border border-pink-100 min-w-[3rem] text-center">{task.progress}%</span>
+            </div>
+            <div className="relative pt-1">
+              <input 
+                  type="range" 
+                  min="0" 
+                  max="100" 
+                  step="5"
+                  value={task.progress} 
+                  onChange={(e) => onUpdate({ progress: parseInt(e.target.value) })}
+                  className="w-full h-2 bg-pink-100 rounded-lg appearance-none cursor-pointer accent-pink-500 hover:accent-pink-400 transition-all"
+                  style={{
+                    background: `linear-gradient(to right, #ff85b2 ${task.progress}%, #ffdeeb ${task.progress}%)`
+                  }}
+              />
+            </div>
+          </div>
+          
+          {/* 日期設定 (與提醒連動顯示) */}
+          <div className="grid grid-cols-2 gap-6">
+             <div className="space-y-2">
+              <label className="text-xs font-bold text-pink-300 flex items-center gap-1 uppercase tracking-wider"><Calendar size={12} /> 開始日期</label>
+              <input 
+                type="date"
+                value={task.startDate.split('T')[0]}
+                onChange={(e) => onUpdate({ startDate: new Date(e.target.value).toISOString() })}
+                className="w-full p-3 rounded-2xl border border-pink-50 text-sm font-bold text-[#5c4b51] focus:outline-none focus:border-pink-200"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-pink-300 flex items-center gap-1 uppercase tracking-wider"><Calendar size={12} /> 結束日期</label>
+              <input 
+                type="date"
+                value={task.endDate.split('T')[0]}
+                onChange={(e) => onUpdate({ endDate: new Date(e.target.value).toISOString() })}
+                className="w-full p-3 rounded-2xl border border-pink-50 text-sm font-bold text-[#5c4b51] focus:outline-none focus:border-pink-200"
+              />
+            </div>
+          </div>
+
+          {/* ⏰ 提醒設定 */}
+          <div className="space-y-3 bg-blue-50/50 p-4 rounded-2xl border border-blue-100">
+            <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-blue-400 flex items-center gap-1 uppercase tracking-wider">
+                  <Bell size={12} /> 任務提醒小幫手
+                  {!('Notification' in window) && <span className="text-[9px] text-red-400 ml-2">(此瀏覽器不支援)</span>}
+                  {permissionState !== 'granted' && (
+                    <button 
+                      className="text-[10px] bg-blue-100 text-blue-500 px-2 py-0.5 rounded-md ml-2 font-bold hover:bg-blue-200 transition-colors animate-pulse" 
+                      onClick={requestNotificationPermission}
+                    >
+                      開啟權限
+                    </button>
+                  )}
+                </label>
+                {/* 🍓 新增測試按鈕 */}
+                <button 
+                  onClick={sendTestNotification}
+                  className="flex items-center gap-1 text-[10px] bg-blue-400 text-white px-2 py-1 rounded-lg font-bold hover:bg-blue-500 active:scale-95 transition-all shadow-sm"
+                >
+                  <Send size={10} /> 立即測試
+                </button>
+            </div>
+            
+            <div className="flex flex-col gap-3">
+              <select 
+                value={task.reminder?.type || 'none'} 
+                onChange={(e) => handleReminderChange(e.target.value as ReminderType)} 
+                className="w-full p-3 rounded-xl border border-blue-100 text-sm font-bold text-[#5c4b51] focus:outline-none focus:ring-2 focus:ring-blue-100 bg-white"
+              >
+                <option value="none">🔕 不用提醒我</option>
+                <option value="1_day">🗓️ 到期前 1 天</option>
+                <option value="3_days">🗓️ 到期前 3 天</option>
+                <option value="custom">⏰ 自訂時間...</option>
+              </select>
+              
+              {task.reminder?.type === 'custom' && (
+                <div className="flex items-center gap-2 animate-in slide-in-from-top-2">
+                  <Clock size={16} className="text-blue-300" />
+                  <input 
+                    type="datetime-local" 
+                    value={task.reminder.date || ''}
+                    onChange={(e) => handleCustomDateChange(e.target.value)}
+                    className="flex-1 p-2 rounded-xl border border-blue-100 text-sm text-[#5c4b51] font-bold bg-white focus:outline-none focus:border-blue-300"
+                  />
+                </div>
+              )}
+              {task.reminder?.type && task.reminder?.type !== 'none' && task.reminder?.type !== 'custom' && (
+                <div className="text-[10px] text-blue-400 font-medium pl-1">
+                  將在 <span className="font-bold">{format(new Date(task.endDate), 'MM/dd')}</span> 的前 {task.reminder.type === '1_day' ? '1' : '3'} 天發送通知
+                </div>
+              )}
             </div>
           </div>
 
