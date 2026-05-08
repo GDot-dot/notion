@@ -394,6 +394,19 @@ const ProjectView: React.FC = () => {
 
   return (
     <div className="flex min-h-screen relative bg-[#fff5f8] dark:bg-kuromi-bg transition-colors duration-500">
+      {/* 🍓 未登入提示橫幅：提醒用戶登入才能跨裝置同步 */}
+      {!state.user && (
+        <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-center gap-3 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg">
+          <CloudOff size={16} className="flex-shrink-0" />
+          <span className="text-sm font-bold">目前為本機模式，資料不會同步到其他裝置。</span>
+          <button
+            onClick={handleLogin}
+            className="flex items-center gap-1.5 px-4 py-1 bg-white text-blue-600 rounded-full text-xs font-black hover:bg-blue-50 transition-all shadow-sm flex-shrink-0"
+          >
+            <LogIn size={13} /> 立即登入 Google 帳號
+          </button>
+        </div>
+      )}
       {isSidebarOpen && <div className="fixed inset-0 bg-pink-900/20 backdrop-blur-sm z-40 md:hidden" onClick={() => setIsSidebarOpen(false)} />}
       {isCelebrating && <Celebration />}
       {activeReminders.length > 0 && <ReminderPopup tasks={activeReminders} onClose={() => setActiveReminders([])} />}
@@ -406,7 +419,7 @@ const ProjectView: React.FC = () => {
         onAddProject={handleAddSubProject}
       />
 
-      <main className="flex-1 p-4 md:p-8 overflow-y-auto max-h-screen custom-scrollbar">
+      <main className={`flex-1 p-4 md:p-8 overflow-y-auto max-h-screen custom-scrollbar ${!state.user ? 'pt-16' : ''}`}>
         <header className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-6">
           <div className="flex items-center gap-6 group">
             <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 text-pink-500 bg-white dark:bg-kuromi-card rounded-xl border border-pink-100 dark:border-gray-700 shadow-sm"><Menu size={24} /></button>
@@ -430,7 +443,7 @@ const ProjectView: React.FC = () => {
             ) : (
               <div className="flex items-center gap-3 bg-white/60 dark:bg-kuromi-card p-1.5 pr-4 rounded-2xl border border-pink-100 shadow-sm">
                 <img src={state.user.photoURL || ''} className="w-8 h-8 rounded-full border-2 border-pink-200 shadow-sm" />
-                <button onClick={() => { localStorage.removeItem('melody_local_data'); auth && signOut(auth); }} className="text-[10px] font-bold text-pink-300">登出</button>
+                <button onClick={() => { auth && signOut(auth); }} className="text-[10px] font-bold text-pink-300">登出</button>
               </div>
             )}
             <button onClick={() => { if (confirm('😱 確定要刪除這個計畫嗎？🍭')) { const remover = (list: Project[]): Project[] => list.filter(p => p.id !== currentProject.id).map(p => ({ ...p, children: remover(p.children) })); const next = remover(state.projects); dispatch({ type: 'UPDATE_PROJECTS', projects: next }); syncToCloud(next); navigate(next.length > 0 ? `/project/${next[0].id}/dashboard` : '/'); } }} className="p-2.5 bg-white dark:bg-kuromi-card text-[#ff85b2] hover:bg-pink-50 rounded-xl border border-pink-50 shadow-sm transition-all" title="刪除計畫"><Trash2 size={20} /></button>

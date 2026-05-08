@@ -84,6 +84,13 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // 用於防抖動 (Debounce) 的 Timer Ref
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // 元件卸載時清除待執行的計時器，避免記憶體洩漏
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
   // 初始化主題
   useEffect(() => {
     if (state.isDarkMode) {

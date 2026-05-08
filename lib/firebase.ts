@@ -1,6 +1,6 @@
 
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import type { User } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
@@ -24,6 +24,12 @@ const app = isConfigured ? initializeApp(firebaseConfig) : null;
 const auth = app ? getAuth(app) : null;
 const db = app ? getFirestore(app) : null;
 const googleProvider = new GoogleAuthProvider();
+
+// 明確設定跨裝置持久化：Token 存在 localStorage，重開瀏覽器仍維持登入狀態
+// 注意：無痕視窗的 localStorage 每次關閉後清空，因此無痕模式仍需重新登入
+if (auth) {
+  setPersistence(auth, browserLocalPersistence).catch(console.error);
+}
 
 export { auth, db, googleProvider, signInWithPopup, signOut, onAuthStateChanged };
 export type { User };
