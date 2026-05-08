@@ -430,7 +430,7 @@ const ProjectView: React.FC = () => {
             ) : (
               <div className="flex items-center gap-3 bg-white/60 dark:bg-kuromi-card p-1.5 pr-4 rounded-2xl border border-pink-100 shadow-sm">
                 <img src={state.user.photoURL || ''} className="w-8 h-8 rounded-full border-2 border-pink-200 shadow-sm" />
-                <button onClick={() => auth && signOut(auth)} className="text-[10px] font-bold text-pink-300">登出</button>
+                <button onClick={() => { localStorage.removeItem('melody_local_data'); auth && signOut(auth); }} className="text-[10px] font-bold text-pink-300">登出</button>
               </div>
             )}
             <button onClick={() => { if (confirm('😱 確定要刪除這個計畫嗎？🍭')) { const remover = (list: Project[]): Project[] => list.filter(p => p.id !== currentProject.id).map(p => ({ ...p, children: remover(p.children) })); const next = remover(state.projects); dispatch({ type: 'UPDATE_PROJECTS', projects: next }); syncToCloud(next); navigate(next.length > 0 ? `/project/${next[0].id}/dashboard` : '/'); } }} className="p-2.5 bg-white dark:bg-kuromi-card text-[#ff85b2] hover:bg-pink-50 rounded-xl border border-pink-50 shadow-sm transition-all" title="刪除計畫"><Trash2 size={20} /></button>
